@@ -125,17 +125,6 @@ export default function CompanySettings() {
     }
   };
 
-  // 企業IDを自動生成
-  const generateCompanyCode = () => {
-    const code = Math.floor(10000000 + Math.random() * 90000000).toString();
-    handleChange('companyCode', code);
-  };
-
-  // 企業ID入力ハンドラ（数字のみ、8桁まで）
-  const handleCompanyCodeChange = (e) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
-    handleChange('companyCode', value);
-  };
 
   // 保存処理
   const handleSubmit = async (e) => {
@@ -146,19 +135,16 @@ export default function CompanySettings() {
       return;
     }
 
-    if (formData.companyCode && formData.companyCode.length !== 8) {
-      setError('企業IDは8桁の数字で入力してください');
-      return;
-    }
-
     setSaving(true);
     setError('');
     setSuccess('');
 
     try {
       const docRef = doc(db, 'companies', companyId);
+      // companyCodeは自動割り当てのため保存対象から除外
+      const { companyCode, ...dataToSave } = formData;
       await updateDoc(docRef, {
-        ...formData,
+        ...dataToSave,
         updatedAt: serverTimestamp()
       });
 
@@ -289,40 +275,14 @@ export default function CompanySettings() {
                 <p className="text-sm text-gray-600 mb-4">
                   日報アプリへのログイン時に使用する8桁の企業IDです。従業員に共有してください。
                 </p>
-                <div className="flex items-end space-x-3">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      企業ID（8桁の数字）
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formData.companyCode}
-                      onChange={handleCompanyCodeChange}
-                      placeholder="12345678"
-                      maxLength={8}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 tracking-widest text-lg font-mono"
-                    />
+                <div className="flex items-center space-x-3">
+                  <div className="px-4 py-3 bg-white border border-gray-300 rounded-lg tracking-widest text-2xl font-mono font-bold text-gray-800">
+                    {formData.companyCode || '未設定'}
                   </div>
-                  <button
-                    type="button"
-                    onClick={generateCompanyCode}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
-                  >
-                    自動生成
-                  </button>
                 </div>
-                {formData.companyCode && formData.companyCode.length === 8 && (
-                  <p className="text-sm text-green-600 mt-2 flex items-center space-x-1">
-                    <CheckCircle size={16} />
-                    <span>有効な企業IDです</span>
-                  </p>
-                )}
-                {formData.companyCode && formData.companyCode.length > 0 && formData.companyCode.length < 8 && (
-                  <p className="text-sm text-orange-600 mt-2">
-                    あと{8 - formData.companyCode.length}桁入力してください
-                  </p>
-                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  ※ 企業IDは自動で割り当てられます（変更不可）
+                </p>
               </div>
 
               {/* 基本情報 */}
