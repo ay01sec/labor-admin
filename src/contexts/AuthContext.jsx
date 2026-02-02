@@ -1,14 +1,15 @@
 // src/contexts/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged 
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail
 } from 'firebase/auth';
-import { 
-  collection, 
-  query, 
-  where, 
+import {
+  collection,
+  query,
+  where,
   getDocs,
   doc,
   getDoc,
@@ -30,10 +31,81 @@ export function AuthProvider({ children }) {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ログイン
-  async function login(email, password) {
+  // 企業コードで企業を検索（未認証でも可能）
+  async function findCompanyByCode(companyCode) {
+    const companiesRef = collection(db, 'companies');
+    const q = query(companiesRef, where('companyCode', '==', companyCode));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      throw new Error('企業IDが見つかりません');
+    }
+
+    const companyDoc = snapshot.docs[0];
+    return {
+      id: companyDoc.id,
+      ...companyDoc.data()
+    };
+  }
+
+  // 企業コード + メールアドレス + パスワードでログイン
+  async function login(companyCode, email, password) {
+    // 1. 先に企業コードで企業を検索（未認証状態で検証）
+    const company = await findCompanyByCode(companyCode);
+
+    // 2. Firebase Authenticationでログイン
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return userCredential.user;
+    const user = userCredential.user;
+
+    try {
+      // 3. その企業にユーザーが存在するか確認
+      const userDocRef = doc(db, 'companies', company.id, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        await signOut(auth);
+        throw new Error('この企業IDに登録されていないユーザーです');
+      }
+
+      const userData = userDocSnap.data();
+
+      if (!userData.isActive) {
+        await signOut(auth);
+        throw new Error('このアカウントは無効化されています');
+      }
+
+      // 管理画面はadmin/managerのみアクセス可能
+      if (!['admin', 'manager'].includes(userData.role)) {
+        await signOut(auth);
+        throw new Error('管理画面へのアクセス権限がありません');
+      }
+
+      // 4. 最終ログイン日時を更新
+      await updateDoc(userDocRef, {
+        lastLoginAt: serverTimestamp()
+      });
+
+      // 5. 状態を更新
+      setCompanyId(company.id);
+      setCompanyInfo(company);
+      setUserInfo({
+        id: user.uid,
+        ...userData
+      });
+
+      // 企業コードをローカルストレージに保存
+      localStorage.setItem('lastCompanyCode', companyCode);
+
+      return user;
+    } catch (error) {
+      await signOut(auth);
+      throw error;
+    }
+  }
+
+  // パスワードリセットメールを送信
+  async function resetPassword(email) {
+    await sendPasswordResetEmail(auth, email);
   }
 
   // ログアウト
@@ -44,26 +116,28 @@ export function AuthProvider({ children }) {
     await signOut(auth);
   }
 
-  // ユーザー情報を取得（どの企業に所属しているか）
+  // ユーザー情報を取得（セッション復元用）
   async function fetchUserInfo(uid) {
     try {
-      // 全企業からこのユーザーを検索
       const companiesRef = collection(db, 'companies');
       const companiesSnapshot = await getDocs(companiesRef);
 
       for (const companyDoc of companiesSnapshot.docs) {
         const userDocRef = doc(db, 'companies', companyDoc.id, 'users', uid);
         const userDocSnap = await getDoc(userDocRef);
-        
+
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          
-          // アカウントが無効な場合
+
           if (!userData.isActive) {
             throw new Error('このアカウントは無効化されています');
           }
 
-          // 最終ログイン日時を更新
+          // 管理画面はadmin/managerのみ
+          if (!['admin', 'manager'].includes(userData.role)) {
+            throw new Error('管理画面へのアクセス権限がありません');
+          }
+
           await updateDoc(userDocRef, {
             lastLoginAt: serverTimestamp()
           });
@@ -129,6 +203,7 @@ export function AuthProvider({ children }) {
     companyInfo,
     login,
     logout,
+    resetPassword,
     isAdmin,
     isOperatorOrAbove,
     loading

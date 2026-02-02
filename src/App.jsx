@@ -8,6 +8,7 @@ import Layout from './components/Layout/Layout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
 
 // Main Pages
 import Dashboard from './pages/Dashboard';
@@ -84,6 +85,12 @@ function AppRoutes() {
       <Route
         path="/login"
         element={currentUser ? <Navigate to="/" /> : <Login />}
+      />
+
+      {/* パスワードリセット */}
+      <Route
+        path="/forgot-password"
+        element={currentUser ? <Navigate to="/" /> : <ForgotPassword />}
       />
 
       {/* 認証が必要なルート */}

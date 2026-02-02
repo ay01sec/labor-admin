@@ -1,10 +1,13 @@
 // src/pages/auth/Login.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, LogIn, AlertCircle, Building } from 'lucide-react';
 
 export default function Login() {
+  const [companyCode, setCompanyCode] = useState(() => {
+    return localStorage.getItem('lastCompanyCode') || '';
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -14,17 +17,28 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const handleCompanyCodeChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+    setCompanyCode(value);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (companyCode.length !== 8) {
+      setError('企業IDは8桁の数字で入力してください');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(companyCode, email, password);
       navigate('/');
     } catch (err) {
       console.error('ログインエラー:', err);
-      
+
       switch (err.code) {
         case 'auth/invalid-email':
           setError('メールアドレスの形式が正しくありません');
@@ -34,6 +48,9 @@ export default function Login() {
           break;
         case 'auth/wrong-password':
           setError('パスワードが正しくありません');
+          break;
+        case 'auth/invalid-credential':
+          setError('メールアドレスまたはパスワードが正しくありません');
           break;
         case 'auth/too-many-requests':
           setError('ログイン試行回数が多すぎます。しばらく待ってから再度お試しください');
@@ -67,7 +84,28 @@ export default function Login() {
         )}
 
         {/* フォーム */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <span className="flex items-center space-x-1">
+                <Building size={16} />
+                <span>企業ID</span>
+              </span>
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={companyCode}
+              onChange={handleCompanyCodeChange}
+              placeholder="12345678"
+              maxLength={8}
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors tracking-widest font-mono text-lg"
+            />
+            <p className="mt-1 text-xs text-gray-500">8桁の数字</p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               メールアドレス
@@ -120,6 +158,16 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        {/* パスワードを忘れた場合 */}
+        <div className="mt-6 text-center">
+          <Link
+            to="/forgot-password"
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            パスワードをお忘れですか？
+          </Link>
+        </div>
 
         {/* フッター */}
         <p className="text-center text-gray-400 text-sm mt-8">
