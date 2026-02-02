@@ -17,11 +17,13 @@ import {
   Edit,
   Trash2,
   Download,
+  Upload,
   ChevronLeft,
   ChevronRight,
   MapPin,
   Calendar
 } from 'lucide-react';
+import CsvImportModal from '../../components/CsvImport/CsvImportModal';
 
 // ステータスバッジ
 function StatusBadge({ status }) {
@@ -54,41 +56,42 @@ export default function SiteList() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterClient, setFilterClient] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showImportModal, setShowImportModal] = useState(false);
   const itemsPerPage = 10;
 
-  // データ取得
-  useEffect(() => {
+  // データ取得関数
+  const fetchData = async () => {
     if (!companyId) return;
+    try {
+      // 現場データ取得
+      const sitesRef = collection(db, 'companies', companyId, 'sites');
+      const sitesQuery = query(sitesRef, orderBy('createdAt', 'desc'));
+      const sitesSnapshot = await getDocs(sitesQuery);
 
-    const fetchData = async () => {
-      try {
-        // 現場データ取得
-        const sitesRef = collection(db, 'companies', companyId, 'sites');
-        const sitesQuery = query(sitesRef, orderBy('createdAt', 'desc'));
-        const sitesSnapshot = await getDocs(sitesQuery);
-        
-        const sitesData = sitesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setSites(sitesData);
+      const sitesData = sitesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setSites(sitesData);
 
-        // 取引先データ取得（フィルター用）
-        const clientsRef = collection(db, 'companies', companyId, 'clients');
-        const clientsSnapshot = await getDocs(clientsRef);
-        const clientsData = clientsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setClients(clientsData);
+      // 取引先データ取得（フィルター用）
+      const clientsRef = collection(db, 'companies', companyId, 'clients');
+      const clientsSnapshot = await getDocs(clientsRef);
+      const clientsData = clientsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setClients(clientsData);
 
-      } catch (error) {
-        console.error('データ取得エラー:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } catch (error) {
+      console.error('データ取得エラー:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // 初回データ取得
+  useEffect(() => {
     fetchData();
   }, [companyId]);
 
@@ -165,13 +168,22 @@ export default function SiteList() {
           <span>現場管理</span>
         </h1>
         {isAdmin() && (
-          <Link
-            to="/sites/new"
-            className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={20} />
-            <span>新規登録</span>
-          </Link>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              <Upload size={20} />
+              <span>CSVインポート</span>
+            </button>
+            <Link
+              to="/sites/new"
+              className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={20} />
+              <span>新規登録</span>
+            </Link>
+          </div>
         )}
       </div>
 
@@ -341,6 +353,18 @@ export default function SiteList() {
           </button>
         </div>
       )}
+
+      {/* CSVインポートモーダル */}
+      <CsvImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        entityType="site"
+        companyId={companyId}
+        onComplete={(result) => {
+          setShowImportModal(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 }

@@ -17,11 +17,13 @@ import {
   Edit,
   Trash2,
   Download,
+  Upload,
   ChevronLeft,
   ChevronRight,
   Users,
   AlertCircle
 } from 'lucide-react';
+import CsvImportModal from '../../components/CsvImport/CsvImportModal';
 
 // ステータスバッジ
 function StatusBadge({ isActive }) {
@@ -63,31 +65,32 @@ export default function EmployeeList() {
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showImportModal, setShowImportModal] = useState(false);
   const itemsPerPage = 10;
 
-  // データ取得
-  useEffect(() => {
+  // データ取得関数
+  const fetchEmployees = async () => {
     if (!companyId) return;
+    try {
+      const employeesRef = collection(db, 'companies', companyId, 'employees');
+      const q = query(employeesRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
 
-    const fetchEmployees = async () => {
-      try {
-        const employeesRef = collection(db, 'companies', companyId, 'employees');
-        const q = query(employeesRef, orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setEmployees(data);
-      } catch (error) {
-        console.error('社員データ取得エラー:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
+      setEmployees(data);
+    } catch (error) {
+      console.error('社員データ取得エラー:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 初回データ取得
+  useEffect(() => {
     fetchEmployees();
   }, [companyId]);
 
@@ -178,13 +181,22 @@ export default function EmployeeList() {
           <span>社員管理</span>
         </h1>
         {isAdmin() && (
-          <Link
-            to="/employees/new"
-            className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={20} />
-            <span>新規登録</span>
-          </Link>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              <Upload size={20} />
+              <span>CSVインポート</span>
+            </button>
+            <Link
+              to="/employees/new"
+              className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={20} />
+              <span>新規登録</span>
+            </Link>
+          </div>
         )}
       </div>
 
@@ -390,6 +402,18 @@ export default function EmployeeList() {
           </button>
         </div>
       )}
+
+      {/* CSVインポートモーダル */}
+      <CsvImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        entityType="employee"
+        companyId={companyId}
+        onComplete={(result) => {
+          setShowImportModal(false);
+          fetchEmployees();
+        }}
+      />
     </div>
   );
 }
