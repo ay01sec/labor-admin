@@ -122,11 +122,29 @@ export default function CsvFileUploader({ config, onFileSelect, isLoading, error
         </button>
       </div>
 
+      {/* 必須項目 */}
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-sm font-medium text-red-800 mb-2">必須項目</p>
+        <div className="flex flex-wrap gap-2">
+          {config.fieldMappings
+            .filter(f => f.required)
+            .map(f => (
+              <span
+                key={f.csvColumn}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+              >
+                {f.csvColumn}
+              </span>
+            ))}
+        </div>
+      </div>
+
       {/* 注意事項 */}
       <div className="text-sm text-gray-500 space-y-1">
         <p>* 対応文字コード: UTF-8, Shift-JIS</p>
         <p>* ファイル形式: CSV（カンマ区切り）</p>
         <p>* 1行目はヘッダー行として認識されます</p>
+        <p>* 必須項目は必ず入力してください</p>
       </div>
     </div>
   );

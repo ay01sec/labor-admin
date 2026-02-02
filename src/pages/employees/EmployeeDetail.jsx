@@ -335,7 +335,9 @@ export default function EmployeeDetail() {
           {activeTab === 'basic' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">氏</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  氏 <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.lastName}
@@ -345,7 +347,9 @@ export default function EmployeeDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">名</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  名 <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.firstName}
