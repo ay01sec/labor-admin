@@ -14,7 +14,10 @@ import {
   Building,
   CreditCard,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Bell,
+  Plus,
+  X,
 } from 'lucide-react';
 
 export default function CompanySettings() {
@@ -47,6 +50,10 @@ export default function CompanySettings() {
       accountType: '',
       accountNumber: '',
       accountHolder: ''
+    },
+    notificationSettings: {
+      enabled: false,
+      reminderTimes: ['17:00']
     }
   });
 
@@ -82,6 +89,10 @@ export default function CompanySettings() {
               accountType: data.bankInfo?.accountType || '',
               accountNumber: data.bankInfo?.accountNumber || '',
               accountHolder: data.bankInfo?.accountHolder || ''
+            },
+            notificationSettings: {
+              enabled: data.notificationSettings?.enabled || false,
+              reminderTimes: data.notificationSettings?.reminderTimes || ['17:00']
             }
           });
         }
@@ -145,7 +156,41 @@ export default function CompanySettings() {
   const tabs = [
     { id: 'company', label: '会社情報', icon: Building },
     { id: 'bank', label: '銀行情報', icon: CreditCard },
+    { id: 'notification', label: '通知設定', icon: Bell },
   ];
+
+  // 通知時刻の追加
+  const addReminderTime = () => {
+    setFormData(prev => ({
+      ...prev,
+      notificationSettings: {
+        ...prev.notificationSettings,
+        reminderTimes: [...prev.notificationSettings.reminderTimes, '18:00']
+      }
+    }));
+  };
+
+  // 通知時刻の削除
+  const removeReminderTime = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      notificationSettings: {
+        ...prev.notificationSettings,
+        reminderTimes: prev.notificationSettings.reminderTimes.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  // 通知時刻の更新
+  const updateReminderTime = (index, value) => {
+    setFormData(prev => ({
+      ...prev,
+      notificationSettings: {
+        ...prev.notificationSettings,
+        reminderTimes: prev.notificationSettings.reminderTimes.map((t, i) => i === index ? value : t)
+      }
+    }));
+  };
 
   if (loading) {
     return (
@@ -455,6 +500,89 @@ export default function CompanySettings() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 通知設定タブ */}
+          {activeTab === 'notification' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">日報リマインダー通知</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  日報が未提出の場合に、指定した時刻にプッシュ通知を送信します。
+                </p>
+
+                {/* 通知ON/OFF */}
+                <div className="flex items-center space-x-3 mb-6">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.notificationSettings.enabled}
+                      onChange={(e) => handleChange('notificationSettings.enabled', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <span className="ml-3 text-sm font-medium text-gray-700">
+                      {formData.notificationSettings.enabled ? '通知ON' : '通知OFF'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* 通知時刻設定 */}
+                {formData.notificationSettings.enabled && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">通知時刻</h3>
+                    <div className="space-y-3">
+                      {formData.notificationSettings.reminderTimes.map((time, index) => (
+                        <div key={index} className="flex items-center space-x-3">
+                          <input
+                            type="time"
+                            value={time}
+                            onChange={(e) => updateReminderTime(index, e.target.value)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          {formData.notificationSettings.reminderTimes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeReminderTime(index)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <X size={18} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addReminderTime}
+                        className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        <Plus size={16} />
+                        <span>時刻を追加</span>
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3">
+                      ※ 指定した各時刻に、日報未提出者へプッシュ通知が送信されます
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <hr />
+
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">カスタム通知</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  任意のメッセージを指定した時刻に通知できます。現場ごとの個別設定も可能です。
+                </p>
+                <a
+                  href="/settings/notifications"
+                  className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+                >
+                  <Bell size={18} />
+                  <span>カスタム通知の設定へ</span>
+                </a>
               </div>
             </div>
           )}

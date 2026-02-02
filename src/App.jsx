@@ -30,6 +30,11 @@ import UserDetail from './pages/users/UserDetail';
 
 // Settings Pages
 import CompanySettings from './pages/settings/CompanySettings';
+import NotificationSettings from './pages/settings/NotificationSettings';
+
+// Report Pages
+import ReportList from './pages/reports/ReportList';
+import ReportDetail from './pages/reports/ReportDetail';
 
 // Placeholder pages (開発中)
 const PlaceholderPage = ({ title }) => (
@@ -105,8 +110,8 @@ function AppRoutes() {
         <Route path="/sites/:id" element={<SiteDetail />} />
 
         {/* 日報管理 */}
-        <Route path="/reports" element={<PlaceholderPage title="日報管理" />} />
-        <Route path="/reports/:id" element={<PlaceholderPage title="日報詳細" />} />
+        <Route path="/reports" element={<ReportList />} />
+        <Route path="/reports/:id" element={<ReportDetail />} />
 
         {/* 管理者専用ルート */}
         <Route path="/contracts" element={
@@ -126,6 +131,9 @@ function AppRoutes() {
         } />
         <Route path="/settings" element={
           <AdminRoute><CompanySettings /></AdminRoute>
+        } />
+        <Route path="/settings/notifications" element={
+          <AdminRoute><NotificationSettings /></AdminRoute>
         } />
       </Route>
 
