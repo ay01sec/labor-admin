@@ -4,10 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   collection,
-  query,
   getDocs,
-  orderBy,
-  where,
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import {
@@ -82,24 +79,30 @@ export default function ReportList() {
         });
         setSites(sitesMap);
 
-        // 日報取得
+        // 日報取得（インデックス問題回避のためシンプルなクエリ）
         const [year, month] = selectedMonth.split('-').map(Number);
         const startDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month, 0, 23, 59, 59);
 
         const reportsRef = collection(db, 'companies', companyId, 'dailyReports');
-        const q = query(
-          reportsRef,
-          where('reportDate', '>=', startDate),
-          where('reportDate', '<=', endDate),
-          orderBy('reportDate', 'desc')
-        );
+        const snapshot = await getDocs(reportsRef);
 
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        // クライアント側で日付フィルタリングとソートを行う
+        const data = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter((report) => {
+            if (!report.reportDate) return false;
+            const reportDate = report.reportDate.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
+            return reportDate >= startDate && reportDate <= endDate;
+          })
+          .sort((a, b) => {
+            const dateA = a.reportDate?.toDate ? a.reportDate.toDate() : new Date(a.reportDate);
+            const dateB = b.reportDate?.toDate ? b.reportDate.toDate() : new Date(b.reportDate);
+            return dateB - dateA; // 降順
+          });
 
         setReports(data);
       } catch (error) {
