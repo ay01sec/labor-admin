@@ -10,6 +10,7 @@ import {
   FileSignature,
   Files,
   CalendarDays,
+  ClipboardList,
   Lock,
   Settings,
   LogOut,
@@ -50,11 +51,19 @@ const menuItems = [
     category: 'マスタ管理',
     adminOnly: false
   },
-  { 
-    id: 'reports', 
-    path: '/reports', 
-    icon: FileText, 
-    label: '日報管理', 
+  {
+    id: 'reports',
+    path: '/reports',
+    icon: FileText,
+    label: '日報管理',
+    category: '業務管理',
+    adminOnly: false
+  },
+  {
+    id: 'attendance',
+    path: '/reports/attendance',
+    icon: ClipboardList,
+    label: '勤怠集計',
     category: '業務管理',
     adminOnly: false
   },

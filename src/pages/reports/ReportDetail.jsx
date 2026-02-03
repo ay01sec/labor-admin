@@ -327,8 +327,47 @@ export default function ReportDetail() {
               <p className="font-medium">{formatDateTime(report.submittedAt)}</p>
             </div>
           </div>
+          {report.weather && (
+            <div className="flex items-start space-x-3">
+              <span className="text-xl mt-0.5">
+                {{ sunny: '\u2600\uFE0F', cloudy: '\u2601\uFE0F', rainy: '\uD83C\uDF27\uFE0F', snowy: '\u2744\uFE0F' }[report.weather] || report.weather}
+              </span>
+              <div>
+                <p className="text-sm text-gray-500">天候</p>
+                <p className="font-medium">
+                  {{ sunny: '\u6674\u308C', cloudy: '\u66C7\u308A', rainy: '\u96E8', snowy: '\u96EA' }[report.weather] || report.weather}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 写真 */}
+      {report.photos?.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">
+            添付写真 ({report.photos.length}枚)
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {report.photos.map((photo, index) => (
+              <a
+                key={index}
+                href={photo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block aspect-square rounded-lg overflow-hidden bg-gray-100 hover:opacity-80 transition-opacity"
+              >
+                <img
+                  src={photo.url}
+                  alt={photo.name || `写真 ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 作業員情報 */}
       <div className="bg-white rounded-xl shadow-sm p-6">
