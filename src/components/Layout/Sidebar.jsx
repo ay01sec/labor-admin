@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Lock,
   Settings,
+  HelpCircle,
   LogOut,
   ChevronLeft,
   ChevronRight
@@ -100,13 +101,21 @@ const menuItems = [
     category: 'システム',
     adminOnly: true
   },
-  { 
-    id: 'settings', 
-    path: '/settings', 
-    icon: Settings, 
-    label: '自社情報設定', 
+  {
+    id: 'settings',
+    path: '/settings',
+    icon: Settings,
+    label: '自社情報設定',
     category: 'システム',
     adminOnly: true
+  },
+  {
+    id: 'help',
+    path: '/help',
+    icon: HelpCircle,
+    label: 'ヘルプ',
+    category: null,
+    adminOnly: false
   },
 ];
 

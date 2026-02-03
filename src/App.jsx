@@ -38,6 +38,9 @@ import ReportList from './pages/reports/ReportList';
 import ReportDetail from './pages/reports/ReportDetail';
 import AttendanceSummary from './pages/reports/AttendanceSummary';
 
+// Help Page
+import HelpPage from './pages/HelpPage';
+
 // Placeholder pages (開発中)
 const PlaceholderPage = ({ title }) => (
   <div className="bg-white rounded-xl shadow-sm p-8 text-center">
@@ -144,6 +147,9 @@ function AppRoutes() {
         <Route path="/settings/notifications" element={
           <AdminRoute><NotificationSettings /></AdminRoute>
         } />
+
+        {/* ヘルプ */}
+        <Route path="/help" element={<HelpPage />} />
       </Route>
 
       {/* 404 */}
