@@ -65,7 +65,8 @@ const menuItems = [
     icon: ClipboardList,
     label: '勤怠集計',
     category: '集計',
-    adminOnly: false
+    adminOnly: false,
+    hidden: true // 公開時にfalseに変更
   },
   { 
     id: 'contracts', 
@@ -109,16 +110,15 @@ const menuItems = [
   },
 ];
 
-export default function Sidebar({ isOpen, setIsOpen }) {
+export default function Sidebar({ isOpen, setIsOpen, onNavigate }) {
   const { companyInfo, userInfo, logout, isAdmin } = useAuth();
 
   let currentCategory = null;
 
   // 管理者以外は管理者専用メニューを非表示
   const visibleMenuItems = menuItems.filter(item => {
-    if (item.adminOnly && !isAdmin()) {
-      return false;
-    }
+    if (item.hidden) return false;
+    if (item.adminOnly && !isAdmin()) return false;
     return true;
   });
 
@@ -170,6 +170,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 <NavLink
                   to={item.path}
                   end={item.path === '/reports'}
+                  onClick={() => onNavigate && onNavigate()}
                   className={({ isActive }) =>
                     `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors ${
                       isActive

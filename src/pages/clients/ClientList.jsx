@@ -165,7 +165,8 @@ export default function ClientList() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {filteredClients.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
+            {/* デスクトップ: テーブル表示 */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -238,6 +239,23 @@ export default function ClientList() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* モバイル: カード表示 */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {paginatedClients.map((client) => (
+                <Link
+                  key={client.id}
+                  to={`/clients/${client.id}`}
+                  className="block p-4 hover:bg-gray-50 active:bg-gray-100"
+                >
+                  <div className="text-sm font-medium text-gray-900">{client.clientName}</div>
+                  <div className="text-xs text-gray-500 mt-1">{client.managerName || '-'}</div>
+                  {client.tel && (
+                    <div className="text-xs text-blue-600 mt-1">{client.tel}</div>
+                  )}
+                </Link>
+              ))}
             </div>
 
             {/* ページネーション */}

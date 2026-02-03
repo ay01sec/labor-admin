@@ -34,7 +34,7 @@ export default function Header({ onMenuClick }) {
           >
             <Menu size={24} />
           </button>
-          <h1 className="text-xl font-bold text-blue-600">労務管理システム</h1>
+          <h1 className="text-base sm:text-xl font-bold text-blue-600">労務管理システム</h1>
         </div>
 
         <div className="flex items-center space-x-4">

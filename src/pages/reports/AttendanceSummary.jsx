@@ -160,7 +160,7 @@ export default function AttendanceSummary() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
           <Clock className="text-gray-500" />
           <span>勤怠集計</span>
@@ -204,38 +204,88 @@ export default function AttendanceSummary() {
             <p>該当月の勤怠データがありません</p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">氏名</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">出勤日数</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">総労働時間</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">昼休憩なし</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
+          <>
+            {/* デスクトップ: テーブル表示 */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">氏名</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">出勤日数</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">総労働時間</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">昼休憩なし</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {summaryData.map((row, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{row.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700 text-right">{row.workDays}日</td>
+                      <td className="px-6 py-4 text-sm text-gray-700 text-right">{row.totalHours.toFixed(1)}h</td>
+                      <td className="px-6 py-4 text-sm text-gray-700 text-right">{row.noLunchDays}日</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td className="px-6 py-3 text-sm font-medium text-gray-900">合計</td>
+                    <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">-</td>
+                    <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">
+                      {summaryData.reduce((sum, r) => sum + r.totalHours, 0).toFixed(1)}h
+                    </td>
+                    <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">
+                      {summaryData.reduce((sum, r) => sum + r.noLunchDays, 0)}日
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* モバイル: カード表示 */}
+            <div className="md:hidden divide-y divide-gray-200">
               {summaryData.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{row.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700 text-right">{row.workDays}日</td>
-                  <td className="px-6 py-4 text-sm text-gray-700 text-right">{row.totalHours.toFixed(1)}h</td>
-                  <td className="px-6 py-4 text-sm text-gray-700 text-right">{row.noLunchDays}日</td>
-                </tr>
+                <div key={i} className="p-4">
+                  <div className="font-medium text-sm text-gray-900 mb-2">{row.name}</div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-xs text-gray-500">出勤日数</p>
+                      <p className="text-sm font-medium text-gray-800">{row.workDays}日</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">総労働時間</p>
+                      <p className="text-sm font-medium text-gray-800">{row.totalHours.toFixed(1)}h</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">昼休憩なし</p>
+                      <p className="text-sm font-medium text-gray-800">{row.noLunchDays}日</p>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td className="px-6 py-3 text-sm font-medium text-gray-900">合計</td>
-                <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">-</td>
-                <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">
-                  {summaryData.reduce((sum, r) => sum + r.totalHours, 0).toFixed(1)}h
-                </td>
-                <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">
-                  {summaryData.reduce((sum, r) => sum + r.noLunchDays, 0)}日
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+              {/* 合計行 */}
+              <div className="p-4 bg-gray-50">
+                <div className="font-medium text-sm text-gray-900 mb-2">合計</div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-xs text-gray-500">出勤日数</p>
+                    <p className="text-sm font-medium text-gray-900">-</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">総労働時間</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {summaryData.reduce((sum, r) => sum + r.totalHours, 0).toFixed(1)}h
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">昼休憩なし</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {summaryData.reduce((sum, r) => sum + r.noLunchDays, 0)}日
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

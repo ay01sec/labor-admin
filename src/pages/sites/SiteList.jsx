@@ -227,7 +227,8 @@ export default function SiteList() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {filteredSites.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
+            {/* デスクトップ: テーブル表示 */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -295,6 +296,26 @@ export default function SiteList() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* モバイル: カード表示 */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {paginatedSites.map((site) => (
+                <Link
+                  key={site.id}
+                  to={`/sites/${site.id}`}
+                  className="block p-4 hover:bg-gray-50 active:bg-gray-100"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-900 truncate">{site.siteName}</span>
+                    <StatusBadge status={site.status} />
+                  </div>
+                  <div className="text-xs text-gray-500">{site.clientName || '-'}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {formatDate(site.startDate)} 〜 {formatDate(site.endDate)}
+                  </div>
+                </Link>
+              ))}
             </div>
 
             {/* ページネーション */}

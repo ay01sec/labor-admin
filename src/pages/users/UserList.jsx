@@ -276,105 +276,131 @@ export default function UserList() {
       {/* テーブル */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {filteredUsers.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    表示名
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    メールアドレス
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    権限
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    紐付け社員
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    状態
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    最終ログイン
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                          <User size={16} className="text-gray-500" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {user.displayName}
-                          {user.id === userInfo.id && (
-                            <span className="ml-2 text-xs text-gray-400">(自分)</span>
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <RoleBadge role={user.role} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {getEmployeeName(user.employeeId)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge isActive={user.isActive} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatLastLogin(user.lastLoginAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center space-x-3">
-                        <Link
-                          to={`/users/${user.id}`}
-                          className="text-blue-600 hover:text-blue-800"
-                          title="編集"
-                        >
-                          <Edit size={18} />
-                        </Link>
-                        {isAdmin() && user.id !== userInfo.id && (
-                          <>
-                            <button
-                              onClick={() => handlePasswordReset(user.email, user.displayName)}
-                              className="text-purple-600 hover:text-purple-800"
-                              title="パスワードリセット"
-                            >
-                              <Mail size={18} />
-                            </button>
-                            <button
-                              onClick={() => toggleUserStatus(user.id, user.isActive)}
-                              className={user.isActive ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'}
-                              title={user.isActive ? '無効化' : '有効化'}
-                            >
-                              {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
-                            </button>
-                            <button
-                              onClick={() => openDeleteModal(user)}
-                              className="text-red-600 hover:text-red-800"
-                              title="削除"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+          <>
+            {/* デスクトップ: テーブル表示 */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      表示名
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      メールアドレス
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      権限
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      紐付け社員
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      状態
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      最終ログイン
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      操作
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                            <User size={16} className="text-gray-500" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {user.displayName}
+                            {user.id === userInfo.id && (
+                              <span className="ml-2 text-xs text-gray-400">(自分)</span>
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <RoleBadge role={user.role} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {getEmployeeName(user.employeeId)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge isActive={user.isActive} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatLastLogin(user.lastLoginAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex items-center space-x-3">
+                          <Link
+                            to={`/users/${user.id}`}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="編集"
+                          >
+                            <Edit size={18} />
+                          </Link>
+                          {isAdmin() && user.id !== userInfo.id && (
+                            <>
+                              <button
+                                onClick={() => handlePasswordReset(user.email, user.displayName)}
+                                className="text-purple-600 hover:text-purple-800"
+                                title="パスワードリセット"
+                              >
+                                <Mail size={18} />
+                              </button>
+                              <button
+                                onClick={() => toggleUserStatus(user.id, user.isActive)}
+                                className={user.isActive ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'}
+                                title={user.isActive ? '無効化' : '有効化'}
+                              >
+                                {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
+                              </button>
+                              <button
+                                onClick={() => openDeleteModal(user)}
+                                className="text-red-600 hover:text-red-800"
+                                title="削除"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* モバイル: カード表示 */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {filteredUsers.map((user) => (
+                <Link
+                  key={user.id}
+                  to={`/users/${user.id}`}
+                  className="block p-4 hover:bg-gray-50 active:bg-gray-100"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      {user.displayName}
+                      {user.id === userInfo.id && <span className="text-xs text-gray-400 ml-1">(自分)</span>}
+                    </span>
+                    <StatusBadge isActive={user.isActive} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500 truncate mr-2">{user.email}</span>
+                    <RoleBadge role={user.role} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="p-8 text-center text-gray-500">
             <Lock size={48} className="mx-auto mb-4 text-gray-300" />

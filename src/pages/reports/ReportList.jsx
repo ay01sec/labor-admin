@@ -518,7 +518,8 @@ export default function ReportList() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {filteredReports.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
+            {/* デスクトップ: テーブル表示 */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -585,6 +586,29 @@ export default function ReportList() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* モバイル: カード表示 */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {paginatedReports.map((report) => (
+                <Link
+                  key={report.id}
+                  to={`/reports/${report.id}`}
+                  className="block p-4 hover:bg-gray-50 active:bg-gray-100"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatDate(report.reportDate)}
+                    </span>
+                    <StatusBadge status={report.status} />
+                  </div>
+                  <p className="text-sm text-gray-800 truncate">{report.siteName || '-'}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-gray-500">{report.createdByName || '-'}</span>
+                    <span className="text-xs text-gray-500">{report.workers?.length || 0}名</span>
+                  </div>
+                </Link>
+              ))}
             </div>
 
             {/* ページネーション */}
