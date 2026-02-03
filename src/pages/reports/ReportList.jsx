@@ -15,6 +15,9 @@ import {
   Eye,
   Calendar,
   Download,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -54,6 +57,7 @@ export default function ReportList() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: 'reportDate', direction: 'desc' });
   const itemsPerPage = 20;
 
   // CSV出力用
@@ -153,9 +157,47 @@ export default function ReportList() {
     return matchesSearch && matchesStatus && matchesSite;
   });
 
+  // ソート
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+    setCurrentPage(1);
+  };
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="text-gray-300" />;
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp size={14} className="text-blue-500" />
+      : <ArrowDown size={14} className="text-blue-500" />;
+  };
+
+  const sortedReports = [...filteredReports].sort((a, b) => {
+    const dir = sortConfig.direction === 'asc' ? 1 : -1;
+    const { key } = sortConfig;
+
+    if (key === 'reportDate' || key === 'submittedAt') {
+      const dateA = a[key]?.toDate ? a[key].toDate() : new Date(a[key] || 0);
+      const dateB = b[key]?.toDate ? b[key].toDate() : new Date(b[key] || 0);
+      return (dateA - dateB) * dir;
+    }
+    if (key === 'siteName' || key === 'createdByName') {
+      return (a[key] || '').localeCompare(b[key] || '') * dir;
+    }
+    if (key === 'workerCount') {
+      return ((a.workers?.length || 0) - (b.workers?.length || 0)) * dir;
+    }
+    if (key === 'status') {
+      const order = { draft: 0, signed: 1, submitted: 2, approved: 3, rejected: 4 };
+      return ((order[a.status] ?? 99) - (order[b.status] ?? 99)) * dir;
+    }
+    return 0;
+  });
+
   // ページネーション
-  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
-  const paginatedReports = filteredReports.slice(
+  const totalPages = Math.ceil(sortedReports.length / itemsPerPage);
+  const paginatedReports = sortedReports.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -418,24 +460,25 @@ export default function ReportList() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      実施日
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      現場名
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      作成者
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      作業員数
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      送信日時
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ステータス
-                    </th>
+                    {[
+                      { key: 'reportDate', label: '実施日' },
+                      { key: 'siteName', label: '現場名' },
+                      { key: 'createdByName', label: '作成者' },
+                      { key: 'workerCount', label: '作業員数' },
+                      { key: 'submittedAt', label: '送信日時' },
+                      { key: 'status', label: 'ステータス' },
+                    ].map((col) => (
+                      <th
+                        key={col.key}
+                        onClick={() => handleSort(col.key)}
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      >
+                        <div className="flex items-center gap-1">
+                          {col.label}
+                          <SortIcon columnKey={col.key} />
+                        </div>
+                      </th>
+                    ))}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       操作
                     </th>
@@ -485,8 +528,8 @@ export default function ReportList() {
             {/* ページネーション */}
             <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-gray-500">
-                {filteredReports.length}件中 {(currentPage - 1) * itemsPerPage + 1}-
-                {Math.min(currentPage * itemsPerPage, filteredReports.length)}件を表示
+                {sortedReports.length}件中 {(currentPage - 1) * itemsPerPage + 1}-
+                {Math.min(currentPage * itemsPerPage, sortedReports.length)}件を表示
               </div>
               <div className="flex items-center space-x-2">
                 <button
