@@ -10,7 +10,8 @@ import {
   doc,
   updateDoc
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../services/firebase';
 import {
   Plus,
   Search,
@@ -19,23 +20,43 @@ import {
   UserCheck,
   UserX,
   Shield,
-  User
+  User,
+  Mail,
+  Trash2,
+  Users
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // 権限バッジ
 function RoleBadge({ role }) {
-  if (role === 'admin') {
-    return (
-      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-        <Shield size={12} />
-        <span>管理者</span>
-      </span>
-    );
-  }
+  const badges = {
+    admin: {
+      bg: 'bg-red-100',
+      text: 'text-red-800',
+      icon: Shield,
+      label: '管理者'
+    },
+    manager: {
+      bg: 'bg-orange-100',
+      text: 'text-orange-800',
+      icon: Users,
+      label: 'マネージャー'
+    },
+    worker: {
+      bg: 'bg-blue-100',
+      text: 'text-blue-800',
+      icon: User,
+      label: 'ワーカー'
+    }
+  };
+
+  const badge = badges[role] || badges.worker;
+  const Icon = badge.icon;
+
   return (
-    <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-      <User size={12} />
-      <span>オペレーター</span>
+    <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+      <Icon size={12} />
+      <span>{badge.label}</span>
     </span>
   );
 }
@@ -59,12 +80,17 @@ function StatusBadge({ isActive }) {
 }
 
 export default function UserList() {
-  const { companyId, userInfo, isAdmin } = useAuth();
-  
+  const { companyId, userInfo, isAdmin, resetPassword } = useAuth();
+
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 削除モーダル用
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // データ取得
   useEffect(() => {
@@ -76,7 +102,7 @@ export default function UserList() {
         const usersRef = collection(db, 'companies', companyId, 'users');
         const usersQuery = query(usersRef, orderBy('createdAt', 'desc'));
         const usersSnapshot = await getDocs(usersQuery);
-        
+
         const usersData = usersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -104,7 +130,7 @@ export default function UserList() {
 
   // フィルタリング
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
+    const matchesSearch =
       (user.displayName || '').includes(searchTerm) ||
       (user.email || '').includes(searchTerm);
     return matchesSearch;
@@ -130,7 +156,7 @@ export default function UserList() {
   const toggleUserStatus = async (userId, currentStatus) => {
     // 自分自身は無効化できない
     if (userId === userInfo.id) {
-      alert('自分自身のアカウントは無効化できません');
+      toast.error('自分自身のアカウントは無効化できません');
       return;
     }
 
@@ -142,13 +168,58 @@ export default function UserList() {
       await updateDoc(userRef, {
         isActive: !currentStatus
       });
-      
-      setUsers(prev => prev.map(u => 
+
+      setUsers(prev => prev.map(u =>
         u.id === userId ? { ...u, isActive: !currentStatus } : u
       ));
+      toast.success(`ユーザーを${action}しました`);
     } catch (error) {
       console.error('ステータス更新エラー:', error);
-      alert('更新に失敗しました');
+      toast.error('更新に失敗しました');
+    }
+  };
+
+  // パスワードリセットメール送信
+  const handlePasswordReset = async (email, userName) => {
+    if (!confirm(`${userName}にパスワードリセットメールを送信しますか？`)) return;
+
+    try {
+      await resetPassword(email);
+      toast.success('パスワードリセットメールを送信しました');
+    } catch (error) {
+      console.error('パスワードリセットエラー:', error);
+      toast.error('パスワードリセットメールの送信に失敗しました');
+    }
+  };
+
+  // 削除確認モーダルを開く
+  const openDeleteModal = (user) => {
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
+
+  // ユーザー削除
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setDeleting(true);
+    try {
+      const deleteUserFn = httpsCallable(functions, 'deleteUser');
+      await deleteUserFn({
+        targetUserId: userToDelete.id,
+        companyId: companyId
+      });
+
+      // ローカルstateから削除
+      setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+      toast.success('ユーザーを削除しました');
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error('ユーザー削除エラー:', error);
+      toast.error(error.message || 'ユーザーの削除に失敗しました');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -183,7 +254,8 @@ export default function UserList() {
       <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
         <p className="text-sm">
           <strong>管理者</strong>: 全ての機能にアクセス可能<br />
-          <strong>オペレーター</strong>: 日報の入力・閲覧、マスタデータの閲覧のみ可能
+          <strong>マネージャー</strong>: 日報承認、一部管理機能にアクセス可能<br />
+          <strong>ワーカー</strong>: 日報入力のみ（管理画面アクセス不可）
         </p>
       </div>
 
@@ -267,17 +339,34 @@ export default function UserList() {
                         <Link
                           to={`/users/${user.id}`}
                           className="text-blue-600 hover:text-blue-800"
+                          title="編集"
                         >
                           <Edit size={18} />
                         </Link>
                         {isAdmin() && user.id !== userInfo.id && (
-                          <button
-                            onClick={() => toggleUserStatus(user.id, user.isActive)}
-                            className={user.isActive ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'}
-                            title={user.isActive ? '無効化' : '有効化'}
-                          >
-                            {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handlePasswordReset(user.email, user.displayName)}
+                              className="text-purple-600 hover:text-purple-800"
+                              title="パスワードリセット"
+                            >
+                              <Mail size={18} />
+                            </button>
+                            <button
+                              onClick={() => toggleUserStatus(user.id, user.isActive)}
+                              className={user.isActive ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'}
+                              title={user.isActive ? '無効化' : '有効化'}
+                            >
+                              {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
+                            </button>
+                            <button
+                              onClick={() => openDeleteModal(user)}
+                              className="text-red-600 hover:text-red-800"
+                              title="削除"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -293,6 +382,51 @@ export default function UserList() {
           </div>
         )}
       </div>
+
+      {/* 削除確認モーダル */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <Trash2 className="text-red-600" size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">ユーザーを削除</h3>
+              </div>
+              <p className="text-gray-600 mb-2">
+                以下のユーザーを完全に削除しますか？
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <p className="font-medium text-gray-900">{userToDelete.displayName}</p>
+                <p className="text-sm text-gray-500">{userToDelete.email}</p>
+              </div>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-4">
+                <strong>警告:</strong> この操作は取り消せません。ユーザーのアカウントとデータが完全に削除されます。
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setUserToDelete(null);
+                  }}
+                  disabled={deleting}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? '削除中...' : '削除する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

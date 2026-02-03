@@ -12,7 +12,8 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { db, auth } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, auth, functions } from '../../services/firebase';
 import {
   Save,
   ArrowLeft,
@@ -20,13 +21,16 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Info
+  Info,
+  Mail,
+  Trash2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function UserDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { companyId, userInfo, isAdmin } = useAuth();
+  const { companyId, userInfo, isAdmin, resetPassword } = useAuth();
   const isNew = id === 'new';
   const isSelf = id === userInfo?.id;
 
@@ -40,10 +44,14 @@ export default function UserDetail() {
     email: '',
     password: '',
     displayName: '',
-    role: 'operator',
+    role: 'worker',
     employeeId: '',
     isActive: true
   });
+
+  // 削除モーダル用
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // データ取得
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function UserDetail() {
               email: data.email || '',
               password: '', // パスワードは表示しない
               displayName: data.displayName || '',
-              role: data.role || 'operator',
+              role: data.role || 'worker',
               employeeId: data.employeeId || '',
               isActive: data.isActive !== false
             });
@@ -184,6 +192,40 @@ export default function UserDetail() {
     }
   };
 
+  // パスワードリセットメール送信
+  const handlePasswordReset = async () => {
+    if (!confirm(`${formData.displayName}にパスワードリセットメールを送信しますか？`)) return;
+
+    try {
+      await resetPassword(formData.email);
+      toast.success('パスワードリセットメールを送信しました');
+    } catch (error) {
+      console.error('パスワードリセットエラー:', error);
+      toast.error('パスワードリセットメールの送信に失敗しました');
+    }
+  };
+
+  // ユーザー削除
+  const handleDeleteUser = async () => {
+    setDeleting(true);
+    try {
+      const deleteUserFn = httpsCallable(functions, 'deleteUser');
+      await deleteUserFn({
+        targetUserId: id,
+        companyId: companyId
+      });
+
+      toast.success('ユーザーを削除しました');
+      navigate('/users');
+    } catch (error) {
+      console.error('ユーザー削除エラー:', error);
+      toast.error(error.message || 'ユーザーの削除に失敗しました');
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -208,16 +250,41 @@ export default function UserDetail() {
             <span>{isNew ? 'ユーザー登録' : formData.displayName}</span>
           </h1>
         </div>
-        {isAdmin() && (
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            <Save size={20} />
-            <span>{saving ? '保存中...' : '保存'}</span>
-          </button>
-        )}
+        <div className="flex items-center space-x-3">
+          {/* パスワードリセット（編集時、自分以外、管理者のみ） */}
+          {!isNew && !isSelf && isAdmin() && (
+            <button
+              onClick={handlePasswordReset}
+              className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+              title="パスワードリセット"
+            >
+              <Mail size={20} />
+              <span>パスワードリセット</span>
+            </button>
+          )}
+          {/* 削除（編集時、自分以外、管理者のみ） */}
+          {!isNew && !isSelf && isAdmin() && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+              title="削除"
+            >
+              <Trash2 size={20} />
+              <span>削除</span>
+            </button>
+          )}
+          {/* 保存 */}
+          {isAdmin() && (
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <Save size={20} />
+              <span>{saving ? '保存中...' : '保存'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* エラー表示 */}
@@ -326,7 +393,8 @@ export default function UserDetail() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="admin">管理者</option>
-                  <option value="operator">オペレーター</option>
+                  <option value="manager">マネージャー</option>
+                  <option value="worker">ワーカー</option>
                 </select>
               </div>
               <div>
@@ -365,11 +433,54 @@ export default function UserDetail() {
             <h3 className="font-medium text-gray-800 mb-2">権限の違い</h3>
             <div className="text-sm text-gray-600 space-y-1">
               <p><strong>管理者:</strong> 全ての機能にアクセス可能（マスタ管理、ユーザー管理、設定など）</p>
-              <p><strong>オペレーター:</strong> 日報の入力・閲覧、マスタデータの閲覧のみ可能</p>
+              <p><strong>マネージャー:</strong> 日報承認、一部管理機能にアクセス可能</p>
+              <p><strong>ワーカー:</strong> 日報入力のみ（管理画面アクセス不可）</p>
             </div>
           </div>
         </form>
       </div>
+
+      {/* 削除確認モーダル */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <Trash2 className="text-red-600" size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">ユーザーを削除</h3>
+              </div>
+              <p className="text-gray-600 mb-2">
+                以下のユーザーを完全に削除しますか？
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <p className="font-medium text-gray-900">{formData.displayName}</p>
+                <p className="text-sm text-gray-500">{formData.email}</p>
+              </div>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-4">
+                <strong>警告:</strong> この操作は取り消せません。ユーザーのアカウントとデータが完全に削除されます。
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? '削除中...' : '削除する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

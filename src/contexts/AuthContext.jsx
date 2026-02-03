@@ -172,9 +172,9 @@ export function AuthProvider({ children }) {
     return userInfo?.role === 'admin';
   }
 
-  // オペレーター以上かどうか
-  function isOperatorOrAbove() {
-    return userInfo?.role === 'admin' || userInfo?.role === 'operator';
+  // マネージャー以上かどうか
+  function isManagerOrAbove() {
+    return ['admin', 'manager'].includes(userInfo?.role);
   }
 
   useEffect(() => {
@@ -205,7 +205,7 @@ export function AuthProvider({ children }) {
     logout,
     resetPassword,
     isAdmin,
-    isOperatorOrAbove,
+    isManagerOrAbove,
     loading
   };
 

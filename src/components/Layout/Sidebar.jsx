@@ -190,7 +190,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 {userInfo?.displayName || 'ユーザー'}
               </p>
               <p className="text-xs text-gray-400">
-                {userInfo?.role === 'admin' ? '管理者' : 'オペレーター'}
+                {userInfo?.role === 'admin' ? '管理者' : userInfo?.role === 'manager' ? 'マネージャー' : 'ワーカー'}
               </p>
             </div>
           )}
