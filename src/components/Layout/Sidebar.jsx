@@ -169,6 +169,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 )}
                 <NavLink
                   to={item.path}
+                  end={item.path === '/reports'}
                   className={({ isActive }) =>
                     `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors ${
                       isActive
