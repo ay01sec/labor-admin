@@ -36,6 +36,7 @@ import NotificationSettings from './pages/settings/NotificationSettings';
 // Report Pages
 import ReportList from './pages/reports/ReportList';
 import ReportDetail from './pages/reports/ReportDetail';
+import AttendanceSummary from './pages/reports/AttendanceSummary';
 
 // Placeholder pages (開発中)
 const PlaceholderPage = ({ title }) => (
@@ -119,6 +120,7 @@ function AppRoutes() {
         {/* 日報管理 */}
         <Route path="/reports" element={<ReportList />} />
         <Route path="/reports/:id" element={<ReportDetail />} />
+        <Route path="/reports/attendance" element={<AttendanceSummary />} />
 
         {/* 管理者専用ルート */}
         <Route path="/contracts" element={

@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  orderBy, 
-  limit 
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
@@ -84,6 +85,7 @@ export default function Dashboard() {
     sites: 0,
     pendingReports: 0
   });
+  const [todayProgress, setTodayProgress] = useState({ submitted: 0, total: 0 });
   const [recentReports, setRecentReports] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,6 +129,36 @@ export default function Dashboard() {
           clients: clientsSnap.size,
           sites: sitesSnap.size,
           pendingReports: pendingReportsSnap.size
+        });
+
+        // 今日の日報提出状況
+        const activeSites = sitesSnap.docs.map(d => d.id);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStart = Timestamp.fromDate(today);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const todayEnd = Timestamp.fromDate(tomorrow);
+
+        const todayReportsSnap = await getDocs(
+          query(
+            collection(db, 'companies', companyId, 'dailyReports'),
+            where('reportDate', '>=', todayStart),
+            where('reportDate', '<', todayEnd)
+          )
+        );
+
+        const submittedSiteIds = new Set();
+        todayReportsSnap.docs.forEach(d => {
+          const data = d.data();
+          if (data.status === 'submitted' || data.status === 'approved') {
+            submittedSiteIds.add(data.siteId);
+          }
+        });
+
+        setTodayProgress({
+          submitted: submittedSiteIds.size,
+          total: activeSites.length,
         });
 
         // 最近の日報取得
@@ -216,18 +248,22 @@ export default function Dashboard() {
           </div>
           <div className="mb-2">
             <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>提出済み: {recentReports.filter(r => r.status !== 'draft').length}</span>
-              <span>---%</span>
+              <span>提出済み: {todayProgress.submitted} / {todayProgress.total} 現場</span>
+              <span>{todayProgress.total > 0 ? Math.round((todayProgress.submitted / todayProgress.total) * 100) : 0}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-4">
               <div
-                className="bg-blue-500 h-4 rounded-full transition-all duration-500"
-                style={{ width: '65%' }}
+                className={`h-4 rounded-full transition-all duration-500 ${
+                  todayProgress.total > 0 && todayProgress.submitted === todayProgress.total
+                    ? 'bg-green-500'
+                    : 'bg-blue-500'
+                }`}
+                style={{ width: `${todayProgress.total > 0 ? Math.round((todayProgress.submitted / todayProgress.total) * 100) : 0}%` }}
               />
             </div>
           </div>
           <p className="text-sm text-gray-500">
-            ※ 日報データが蓄積されると統計が表示されます
+            今日の稼働現場に対する日報提出率
           </p>
         </div>
 

@@ -57,6 +57,7 @@ export default function CompanySettings() {
       enabled: false,
       reminderTimes: ['17:00']
     },
+    reportDeadline: '18:00',
     approvalSettings: {
       mode: 'manual',
       autoApprovalEmails: []
@@ -97,6 +98,7 @@ export default function CompanySettings() {
               accountNumber: data.bankInfo?.accountNumber || '',
               accountHolder: data.bankInfo?.accountHolder || ''
             },
+            reportDeadline: data.reportDeadline || '18:00',
             notificationSettings: {
               enabled: data.notificationSettings?.enabled || false,
               reminderTimes: data.notificationSettings?.reminderTimes || ['17:00']
@@ -569,6 +571,25 @@ export default function CompanySettings() {
           {/* 通知設定タブ */}
           {activeTab === 'notification' && (
             <div className="space-y-6">
+              {/* 日報提出期限 */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">日報提出期限</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  日報アプリに表示される提出期限の時刻を設定します。期限を過ぎると警告が表示されます。
+                </p>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="time"
+                    value={formData.reportDeadline}
+                    onChange={(e) => handleChange('reportDeadline', e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <span className="text-sm text-gray-500">（デフォルト: 18:00）</span>
+                </div>
+              </div>
+
+              <hr />
+
               <div>
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">日報リマインダー通知</h2>
                 <p className="text-sm text-gray-600 mb-4">

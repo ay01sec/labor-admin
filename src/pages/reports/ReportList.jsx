@@ -6,6 +6,7 @@ import {
   collection,
   getDocs,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../services/firebase';
 import {
   Search,
@@ -59,6 +60,19 @@ export default function ReportList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: 'reportDate', direction: 'desc' });
   const itemsPerPage = 20;
+
+  // PDF一括DL用
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfDateRange, setPdfDateRange] = useState(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      startDate: monthStart.toISOString().split('T')[0],
+      endDate: monthEnd.toISOString().split('T')[0],
+    };
+  });
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // CSV出力用
   const [showCsvModal, setShowCsvModal] = useState(false);
@@ -342,6 +356,45 @@ export default function ReportList() {
     }
   };
 
+  // PDF一括DL
+  const handleBulkPdfDownload = async () => {
+    setPdfLoading(true);
+    try {
+      const functions = getFunctions(undefined, 'asia-northeast1');
+      const generateBulkPdf = httpsCallable(functions, 'generateBulkPdf');
+      const result = await generateBulkPdf({
+        companyId,
+        startDate: pdfDateRange.startDate,
+        endDate: pdfDateRange.endDate,
+      });
+
+      if (result.data?.zipBase64) {
+        const byteCharacters = atob(result.data.zipBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `日報PDF_${pdfDateRange.startDate}_${pdfDateRange.endDate}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`${result.data.count}件のPDFをダウンロードしました`);
+        setShowPdfModal(false);
+      } else {
+        toast.error('該当するデータがありません');
+      }
+    } catch (error) {
+      console.error('PDF一括DLエラー:', error);
+      toast.error('PDF一括ダウンロードに失敗しました');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   // 現場リスト（フィルター用）
   const siteList = Object.entries(sites).map(([id, data]) => ({
     id,
@@ -364,13 +417,22 @@ export default function ReportList() {
           <FileText className="text-blue-500" />
           <span>日報管理</span>
         </h1>
-        <button
-          onClick={() => setShowCsvModal(true)}
-          className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-        >
-          <Download size={20} />
-          <span>CSV出力</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowPdfModal(true)}
+            className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Download size={20} />
+            <span>PDF一括DL</span>
+          </button>
+          <button
+            onClick={() => setShowCsvModal(true)}
+            className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <Download size={20} />
+            <span>CSV出力</span>
+          </button>
+        </div>
       </div>
 
       {/* 検索・フィルター */}
@@ -630,6 +692,64 @@ export default function ReportList() {
                 >
                   <Download size={18} />
                   <span>{csvLoading ? 'エクスポート中...' : 'ダウンロード'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF一括DLモーダル */}
+      {showPdfModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Download className="text-blue-600" size={20} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">PDF一括ダウンロード</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">開始日</label>
+                  <input
+                    type="date"
+                    value={pdfDateRange.startDate}
+                    onChange={(e) => setPdfDateRange((prev) => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">終了日</label>
+                  <input
+                    type="date"
+                    value={pdfDateRange.endDate}
+                    onChange={(e) => setPdfDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+                <p>指定期間内の承認済み日報をPDF化し、ZIPファイルでダウンロードします。</p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowPdfModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleBulkPdfDownload}
+                  disabled={pdfLoading}
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <Download size={18} />
+                  <span>{pdfLoading ? '生成中...' : 'ダウンロード'}</span>
                 </button>
               </div>
             </div>

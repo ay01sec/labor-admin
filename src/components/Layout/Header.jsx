@@ -1,9 +1,28 @@
 // src/components/Layout/Header.jsx
+import { useState, useRef, useEffect } from 'react';
 import { Bell, Menu } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
+import NotificationPopup from './NotificationPopup';
 
 export default function Header({ onMenuClick }) {
   const { userInfo } = useAuth();
+  const { notifications, badgeCount } = useNotifications();
+  const [showPopup, setShowPopup] = useState(false);
+  const popupRef = useRef(null);
+
+  // ポップアップ外クリックで閉じる
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (popupRef.current && !popupRef.current.contains(e.target)) {
+        setShowPopup(false);
+      }
+    }
+    if (showPopup) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPopup]);
 
   return (
     <header className="bg-white shadow-sm fixed top-0 right-0 left-0 z-30 lg:left-64">
@@ -20,12 +39,26 @@ export default function Header({ onMenuClick }) {
 
         <div className="flex items-center space-x-4">
           {/* 通知ベル */}
-          <button className="text-gray-500 hover:text-gray-700 relative p-2 rounded-lg hover:bg-gray-100">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              3
-            </span>
-          </button>
+          <div className="relative" ref={popupRef}>
+            <button
+              onClick={() => setShowPopup((prev) => !prev)}
+              className="text-gray-500 hover:text-gray-700 relative p-2 rounded-lg hover:bg-gray-100"
+            >
+              <Bell size={20} />
+              {badgeCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </span>
+              )}
+            </button>
+
+            {showPopup && (
+              <NotificationPopup
+                notifications={notifications}
+                onClose={() => setShowPopup(false)}
+              />
+            )}
+          </div>
 
           {/* ユーザー情報 */}
           <div className="flex items-center space-x-2">
