@@ -119,8 +119,8 @@ function AppRoutes() {
 
         {/* 日報管理 */}
         <Route path="/reports" element={<ReportList />} />
-        <Route path="/reports/:id" element={<ReportDetail />} />
         <Route path="/reports/attendance" element={<AttendanceSummary />} />
+        <Route path="/reports/:id" element={<ReportDetail />} />
 
         {/* 管理者専用ルート */}
         <Route path="/contracts" element={

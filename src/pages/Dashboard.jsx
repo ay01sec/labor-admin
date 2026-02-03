@@ -238,12 +238,12 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 今月の日報状況 */}
+        {/* 今日の日報状況 */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center space-x-2">
               <TrendingUp size={20} className="text-blue-500" />
-              <span>今月の日報状況</span>
+              <span>今日の日報状況</span>
             </h2>
           </div>
           <div className="mb-2">
