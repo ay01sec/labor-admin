@@ -18,6 +18,7 @@ import {
   Bell,
   Plus,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 
 export default function CompanySettings() {
@@ -55,6 +56,10 @@ export default function CompanySettings() {
     notificationSettings: {
       enabled: false,
       reminderTimes: ['17:00']
+    },
+    approvalSettings: {
+      mode: 'manual',
+      autoApprovalEmails: []
     }
   });
 
@@ -95,6 +100,10 @@ export default function CompanySettings() {
             notificationSettings: {
               enabled: data.notificationSettings?.enabled || false,
               reminderTimes: data.notificationSettings?.reminderTimes || ['17:00']
+            },
+            approvalSettings: {
+              mode: data.approvalSettings?.mode || 'manual',
+              autoApprovalEmails: data.approvalSettings?.autoApprovalEmails || []
             }
           });
         }
@@ -162,6 +171,7 @@ export default function CompanySettings() {
     { id: 'company', label: '会社情報', icon: Building },
     { id: 'bank', label: '銀行情報', icon: CreditCard },
     { id: 'notification', label: '通知設定', icon: Bell },
+    { id: 'approval', label: '承認設定', icon: ClipboardCheck },
   ];
 
   // 通知時刻の追加
@@ -193,6 +203,37 @@ export default function CompanySettings() {
       notificationSettings: {
         ...prev.notificationSettings,
         reminderTimes: prev.notificationSettings.reminderTimes.map((t, i) => i === index ? value : t)
+      }
+    }));
+  };
+
+  // 自動承認メールアドレスの管理
+  const addApprovalEmail = () => {
+    setFormData(prev => ({
+      ...prev,
+      approvalSettings: {
+        ...prev.approvalSettings,
+        autoApprovalEmails: [...prev.approvalSettings.autoApprovalEmails, '']
+      }
+    }));
+  };
+
+  const removeApprovalEmail = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      approvalSettings: {
+        ...prev.approvalSettings,
+        autoApprovalEmails: prev.approvalSettings.autoApprovalEmails.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const updateApprovalEmail = (index, value) => {
+    setFormData(prev => ({
+      ...prev,
+      approvalSettings: {
+        ...prev.approvalSettings,
+        autoApprovalEmails: prev.approvalSettings.autoApprovalEmails.map((e, i) => i === index ? value : e)
       }
     }));
   };
@@ -604,6 +645,90 @@ export default function CompanySettings() {
                   <Bell size={18} />
                   <span>カスタム通知の設定へ</span>
                 </a>
+              </div>
+            </div>
+          )}
+
+          {/* 承認設定タブ */}
+          {activeTab === 'approval' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">日報承認設定</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  日報送信後の承認フローを設定します。現場ごとに個別設定も可能です（現場マスタで設定）。
+                </p>
+
+                <div className="space-y-3">
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${formData.approvalSettings.mode === 'manual' ? 'border-blue-500 bg-blue-50' : ''}`}>
+                    <input
+                      type="radio"
+                      name="approvalMode"
+                      value="manual"
+                      checked={formData.approvalSettings.mode === 'manual'}
+                      onChange={() => handleChange('approvalSettings.mode', 'manual')}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900">手動承認</span>
+                      <p className="text-sm text-gray-500 mt-1">日報送信後、管理画面で承認・差戻しを行います。</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${formData.approvalSettings.mode === 'auto' ? 'border-blue-500 bg-blue-50' : ''}`}>
+                    <input
+                      type="radio"
+                      name="approvalMode"
+                      value="auto"
+                      checked={formData.approvalSettings.mode === 'auto'}
+                      onChange={() => handleChange('approvalSettings.mode', 'auto')}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900">自動承認</span>
+                      <p className="text-sm text-gray-500 mt-1">日報送信と同時に自動承認し、PDFをメールで送信します。</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {formData.approvalSettings.mode === 'auto' && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">PDF送信先メールアドレス</h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    自動承認時に日報PDFが送信されるメールアドレスを設定します。複数登録可能です。
+                  </p>
+                  <div className="space-y-3">
+                    {formData.approvalSettings.autoApprovalEmails.map((email, index) => (
+                      <div key={index} className="flex items-center space-x-3">
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => updateApprovalEmail(index, e.target.value)}
+                          placeholder="example@example.com"
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeApprovalEmail(index)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addApprovalEmail}
+                      className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      <Plus size={16} />
+                      <span>メールアドレスを追加</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+                <strong>ヒント:</strong> 現場ごとに承認フローを変更する場合は、現場マスタの各現場詳細画面で個別に設定できます。
               </div>
             </div>
           )}

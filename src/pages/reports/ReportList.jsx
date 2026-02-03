@@ -14,9 +14,11 @@ import {
   ChevronRight,
   Eye,
   Calendar,
+  Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 
 // ステータスバッジ
 function StatusBadge({ status }) {
@@ -54,6 +56,21 @@ export default function ReportList() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
+  // CSV出力用
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [csvDateRange, setCsvDateRange] = useState(() => {
+    const now = new Date();
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    return {
+      startDate: prevMonthStart.toISOString().split('T')[0],
+      endDate: prevMonthEnd.toISOString().split('T')[0],
+    };
+  });
+  const [csvEmployeeFilter, setCsvEmployeeFilter] = useState('');
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [employees, setEmployees] = useState([]);
+
   // データ取得
   useEffect(() => {
     if (!companyId) return;
@@ -78,6 +95,15 @@ export default function ReportList() {
           sitesMap[doc.id] = doc.data();
         });
         setSites(sitesMap);
+
+        // 従業員一覧取得（CSVフィルター用）
+        const employeesRef = collection(db, 'companies', companyId, 'employees');
+        const employeesSnapshot = await getDocs(employeesRef);
+        const employeesData = employeesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setEmployees(employeesData);
 
         // 日報取得（インデックス問題回避のためシンプルなクエリ）
         const [year, month] = selectedMonth.split('-').map(Number);
@@ -160,6 +186,120 @@ export default function ReportList() {
     return format(date, 'M/d HH:mm', { locale: ja });
   };
 
+  // CSV出力
+  const handleCsvExport = async () => {
+    setCsvLoading(true);
+    try {
+      const startDate = new Date(csvDateRange.startDate);
+      const endDate = new Date(csvDateRange.endDate + 'T23:59:59');
+
+      const reportsRef = collection(db, 'companies', companyId, 'dailyReports');
+      const snapshot = await getDocs(reportsRef);
+
+      const targetReports = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((report) => {
+          if (!report.reportDate) return false;
+          const reportDate = report.reportDate.toDate
+            ? report.reportDate.toDate()
+            : new Date(report.reportDate);
+          return reportDate >= startDate && reportDate <= endDate;
+        })
+        .sort((a, b) => {
+          const dateA = a.reportDate?.toDate ? a.reportDate.toDate() : new Date(a.reportDate);
+          const dateB = b.reportDate?.toDate ? b.reportDate.toDate() : new Date(b.reportDate);
+          return dateA - dateB;
+        });
+
+      const statusLabels = {
+        draft: '下書き',
+        signed: 'サイン済み',
+        submitted: '送信完了',
+        approved: '承認済み',
+        rejected: '差戻し',
+      };
+
+      const headers = [
+        '実施日', '現場名', '作成者', '作業員名', '開始時間', '終了時間',
+        '昼休憩', '備考', 'ステータス', '送信日時', '承認日時',
+      ];
+
+      const rows = [];
+      for (const report of targetReports) {
+        const workers = report.workers || [];
+        const reportDate = report.reportDate?.toDate
+          ? report.reportDate.toDate()
+          : new Date(report.reportDate);
+        const dateStr = reportDate.toLocaleDateString('ja-JP');
+
+        const submittedStr = report.submittedAt
+          ? (report.submittedAt.toDate
+              ? report.submittedAt.toDate()
+              : new Date(report.submittedAt)
+            ).toLocaleString('ja-JP')
+          : '';
+        const approvedStr = report.approval?.approvedAt
+          ? (report.approval.approvedAt.toDate
+              ? report.approval.approvedAt.toDate()
+              : new Date(report.approval.approvedAt)
+            ).toLocaleString('ja-JP')
+          : '';
+
+        if (workers.length === 0) {
+          // 作業員がいない場合も1行出力
+          if (!csvEmployeeFilter) {
+            rows.push([
+              dateStr, report.siteName || '', report.createdByName || '',
+              '', '', '', '', '',
+              statusLabels[report.status] || report.status,
+              submittedStr, approvedStr,
+            ]);
+          }
+        } else {
+          for (const worker of workers) {
+            if (csvEmployeeFilter && worker.employeeId !== csvEmployeeFilter) continue;
+
+            rows.push([
+              dateStr,
+              report.siteName || '',
+              report.createdByName || '',
+              worker.name || '',
+              worker.startTime || '',
+              worker.endTime || '',
+              worker.noLunchBreak ? 'なし' : 'あり',
+              `"${(worker.remarks || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+              statusLabels[report.status] || report.status,
+              submittedStr,
+              approvedStr,
+            ]);
+          }
+        }
+      }
+
+      if (rows.length === 0) {
+        toast.error('該当するデータがありません');
+        setCsvLoading(false);
+        return;
+      }
+
+      const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `日報一覧_${csvDateRange.startDate}_${csvDateRange.endDate}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      toast.success('CSVをダウンロードしました');
+      setShowCsvModal(false);
+    } catch (error) {
+      console.error('CSV出力エラー:', error);
+      toast.error('CSV出力に失敗しました');
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
   // 現場リスト（フィルター用）
   const siteList = Object.entries(sites).map(([id, data]) => ({
     id,
@@ -182,6 +322,13 @@ export default function ReportList() {
           <FileText className="text-blue-500" />
           <span>日報管理</span>
         </h1>
+        <button
+          onClick={() => setShowCsvModal(true)}
+          className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+        >
+          <Download size={20} />
+          <span>CSV出力</span>
+        </button>
       </div>
 
       {/* 検索・フィルター */}
@@ -369,6 +516,83 @@ export default function ReportList() {
           </div>
         )}
       </div>
+
+      {/* CSV出力モーダル */}
+      {showCsvModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Download className="text-blue-600" size={20} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">日報CSV出力</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">開始日</label>
+                  <input
+                    type="date"
+                    value={csvDateRange.startDate}
+                    onChange={(e) => setCsvDateRange((prev) => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">終了日</label>
+                  <input
+                    type="date"
+                    value={csvDateRange.endDate}
+                    onChange={(e) => setCsvDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">従業員</label>
+                <select
+                  value={csvEmployeeFilter}
+                  onChange={(e) => setCsvEmployeeFilter(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">全員</option>
+                  {employees
+                    .filter((e) => e.isActive !== false)
+                    .sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''))
+                    .map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.lastName} {emp.firstName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+                <p>作業員が複数いる日報は、作業員ごとに1行ずつ出力されます。</p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowCsvModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleCsvExport}
+                  disabled={csvLoading}
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <Download size={18} />
+                  <span>{csvLoading ? 'エクスポート中...' : 'ダウンロード'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

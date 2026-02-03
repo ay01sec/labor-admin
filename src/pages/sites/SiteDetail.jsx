@@ -16,7 +16,9 @@ import {
   Save,
   ArrowLeft,
   MapPin,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  X
 } from 'lucide-react';
 
 export default function SiteDetail() {
@@ -37,7 +39,11 @@ export default function SiteDetail() {
     address: '',
     startDate: '',
     endDate: '',
-    status: 'pending'
+    status: 'pending',
+    approvalSettings: {
+      mode: 'default',
+      autoApprovalEmails: []
+    }
   });
 
   // データ取得
@@ -73,7 +79,11 @@ export default function SiteDetail() {
             setFormData({
               ...data,
               startDate: formatDate(data.startDate),
-              endDate: formatDate(data.endDate)
+              endDate: formatDate(data.endDate),
+              approvalSettings: {
+                mode: data.approvalSettings?.mode || 'default',
+                autoApprovalEmails: data.approvalSettings?.autoApprovalEmails || []
+              }
             });
           } else {
             setError('現場が見つかりません');
@@ -147,6 +157,37 @@ export default function SiteDetail() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // 承認設定メールアドレスの管理
+  const addApprovalEmail = () => {
+    setFormData(prev => ({
+      ...prev,
+      approvalSettings: {
+        ...prev.approvalSettings,
+        autoApprovalEmails: [...(prev.approvalSettings?.autoApprovalEmails || []), '']
+      }
+    }));
+  };
+
+  const removeApprovalEmail = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      approvalSettings: {
+        ...prev.approvalSettings,
+        autoApprovalEmails: (prev.approvalSettings?.autoApprovalEmails || []).filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const updateApprovalEmail = (index, value) => {
+    setFormData(prev => ({
+      ...prev,
+      approvalSettings: {
+        ...prev.approvalSettings,
+        autoApprovalEmails: (prev.approvalSettings?.autoApprovalEmails || []).map((e, i) => i === index ? value : e)
+      }
+    }));
   };
 
   if (loading) {
@@ -278,6 +319,72 @@ export default function SiteDetail() {
                 />
               </div>
             </div>
+          </div>
+
+          <hr />
+
+          {/* 承認設定 */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">承認設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              この現場の日報承認フローを設定します。「デフォルト」を選ぶと企業設定に従います。
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">承認モード</label>
+                <select
+                  value={formData.approvalSettings?.mode || 'default'}
+                  onChange={(e) => handleChange('approvalSettings', {
+                    ...(formData.approvalSettings || {}),
+                    mode: e.target.value
+                  })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="default">デフォルト（企業設定に従う）</option>
+                  <option value="manual">手動承認</option>
+                  <option value="auto">自動承認</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.approvalSettings?.mode === 'auto' && (
+              <div className="mt-4 bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  PDF送信先メールアドレス
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  空の場合は企業設定のメールアドレスが使用されます。
+                </p>
+                <div className="space-y-3">
+                  {(formData.approvalSettings?.autoApprovalEmails || []).map((email, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => updateApprovalEmail(index, e.target.value)}
+                        placeholder="example@example.com"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeApprovalEmail(index)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addApprovalEmail}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    <Plus size={16} />
+                    <span>メールアドレスを追加</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </form>
       </div>
