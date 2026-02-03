@@ -64,7 +64,7 @@ const menuItems = [
     path: '/reports/attendance',
     icon: ClipboardList,
     label: '勤怠集計',
-    category: '業務管理',
+    category: '集計',
     adminOnly: false
   },
   { 

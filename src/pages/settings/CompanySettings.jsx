@@ -19,6 +19,7 @@ import {
   Plus,
   X,
   ClipboardCheck,
+  Clock,
 } from 'lucide-react';
 
 export default function CompanySettings() {
@@ -61,6 +62,10 @@ export default function CompanySettings() {
     approvalSettings: {
       mode: 'manual',
       autoApprovalEmails: []
+    },
+    attendanceSettings: {
+      deductLunchBreak: true,
+      lunchBreakMinutes: 60,
     }
   });
 
@@ -106,6 +111,10 @@ export default function CompanySettings() {
             approvalSettings: {
               mode: data.approvalSettings?.mode || 'manual',
               autoApprovalEmails: data.approvalSettings?.autoApprovalEmails || []
+            },
+            attendanceSettings: {
+              deductLunchBreak: data.attendanceSettings?.deductLunchBreak !== false,
+              lunchBreakMinutes: data.attendanceSettings?.lunchBreakMinutes ?? 60,
             }
           });
         }
@@ -174,6 +183,7 @@ export default function CompanySettings() {
     { id: 'bank', label: '銀行情報', icon: CreditCard },
     { id: 'notification', label: '通知設定', icon: Bell },
     { id: 'approval', label: '承認設定', icon: ClipboardCheck },
+    { id: 'attendance', label: '勤怠設定', icon: Clock },
   ];
 
   // 通知時刻の追加
@@ -750,6 +760,90 @@ export default function CompanySettings() {
 
               <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
                 <strong>ヒント:</strong> 現場ごとに承認フローを変更する場合は、現場マスタの各現場詳細画面で個別に設定できます。
+              </div>
+            </div>
+          )}
+
+          {/* 勤怠設定タブ */}
+          {activeTab === 'attendance' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">昼休憩の控除設定</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  勤怠集計で稼働時間を計算する際に、昼休憩の時間を控除するかどうかを設定します。
+                </p>
+
+                <div className="space-y-3">
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${formData.attendanceSettings.deductLunchBreak ? 'border-blue-500 bg-blue-50' : ''}`}>
+                    <input
+                      type="radio"
+                      name="deductLunchBreak"
+                      checked={formData.attendanceSettings.deductLunchBreak}
+                      onChange={() => setFormData(prev => ({
+                        ...prev,
+                        attendanceSettings: { ...prev.attendanceSettings, deductLunchBreak: true }
+                      }))}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900">昼休憩を稼働時間から控除する</span>
+                      <p className="text-sm text-gray-500 mt-1">
+                        昼休憩ありの場合、設定した休憩時間を差し引いて稼働時間を計算します。
+                      </p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${!formData.attendanceSettings.deductLunchBreak ? 'border-blue-500 bg-blue-50' : ''}`}>
+                    <input
+                      type="radio"
+                      name="deductLunchBreak"
+                      checked={!formData.attendanceSettings.deductLunchBreak}
+                      onChange={() => setFormData(prev => ({
+                        ...prev,
+                        attendanceSettings: { ...prev.attendanceSettings, deductLunchBreak: false }
+                      }))}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900">昼休憩を稼働時間に含む</span>
+                      <p className="text-sm text-gray-500 mt-1">
+                        昼休憩の有無に関わらず、開始〜終了の全時間を稼働時間として計算します。
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {formData.attendanceSettings.deductLunchBreak && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">昼休憩の控除時間</h3>
+                  <div className="flex items-center space-x-3">
+                    <select
+                      value={formData.attendanceSettings.lunchBreakMinutes}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        attendanceSettings: { ...prev.attendanceSettings, lunchBreakMinutes: Number(e.target.value) }
+                      }))}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={30}>30分</option>
+                      <option value={45}>45分</option>
+                      <option value={60}>60分（1時間）</option>
+                      <option value={90}>90分（1.5時間）</option>
+                    </select>
+                    <span className="text-sm text-gray-500">（デフォルト: 60分）</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    ※ 「昼休憩なし」にチェックが入っている作業員は、この設定に関わらず控除されません。
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+                <strong>計算例:</strong> 開始 8:00、終了 17:00 の場合
+                <br />
+                {formData.attendanceSettings.deductLunchBreak
+                  ? `→ 昼休憩あり: ${9 - formData.attendanceSettings.lunchBreakMinutes / 60}時間 / 昼休憩なし: 9時間`
+                  : '→ 昼休憩の有無に関わらず: 9時間'}
               </div>
             </div>
           )}

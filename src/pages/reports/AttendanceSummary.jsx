@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Clock, Download } from 'lucide-react';
 
@@ -13,6 +13,10 @@ export default function AttendanceSummary() {
   });
   const [summaryData, setSummaryData] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [attendanceSettings, setAttendanceSettings] = useState({
+    deductLunchBreak: true,
+    lunchBreakMinutes: 60,
+  });
 
   const generateMonthOptions = () => {
     const options = [];
@@ -27,12 +31,15 @@ export default function AttendanceSummary() {
   };
 
   // 労働時間計算 (startTime, endTime -> hours)
-  const calcWorkHours = (startTime, endTime, noLunchBreak) => {
+  const calcWorkHours = (startTime, endTime, noLunchBreak, settings) => {
     if (!startTime || !endTime) return 0;
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
-    const lunchMinutes = noLunchBreak ? 0 : 60;
+    let lunchMinutes = 0;
+    if (!noLunchBreak && settings.deductLunchBreak) {
+      lunchMinutes = settings.lunchBreakMinutes || 60;
+    }
     return Math.max(0, (totalMinutes - lunchMinutes) / 60);
   };
 
@@ -42,6 +49,15 @@ export default function AttendanceSummary() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // 会社設定取得
+        const companyDoc = await getDoc(doc(db, 'companies', companyId));
+        const companyData = companyDoc.data();
+        const settings = {
+          deductLunchBreak: companyData?.attendanceSettings?.deductLunchBreak !== false,
+          lunchBreakMinutes: companyData?.attendanceSettings?.lunchBreakMinutes ?? 60,
+        };
+        setAttendanceSettings(settings);
+
         // 従業員取得
         const empSnap = await getDocs(
           query(collection(db, 'companies', companyId, 'employees'), where('isActive', '==', true))
@@ -94,7 +110,7 @@ export default function AttendanceSummary() {
             }
 
             summaryMap[key].dates.add(dateStr);
-            summaryMap[key].totalHours += calcWorkHours(worker.startTime, worker.endTime, worker.noLunchBreak);
+            summaryMap[key].totalHours += calcWorkHours(worker.startTime, worker.endTime, worker.noLunchBreak, settings);
             if (worker.noLunchBreak) {
               summaryMap[key].noLunchDays += 1;
             }
@@ -168,6 +184,14 @@ export default function AttendanceSummary() {
             <span>CSV出力</span>
           </button>
         </div>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600">
+        <span className="font-medium">稼働時間の計算: </span>
+        {attendanceSettings.deductLunchBreak
+          ? `昼休憩あり → ${attendanceSettings.lunchBreakMinutes}分を控除 / 昼休憩なし → 控除なし`
+          : '昼休憩の有無に関わらず控除なし（全時間を稼働時間に算入）'}
+        <span className="text-gray-400 ml-2">（自社情報設定 → 勤怠設定で変更可能）</span>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
