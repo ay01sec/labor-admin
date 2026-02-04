@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { HelpCircle } from 'lucide-react';
 import manualContent from '../../MANUAL.md?raw';
 
@@ -22,10 +23,11 @@ export default function HelpPage() {
         prose-th:bg-gray-50 prose-th:px-4 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:text-gray-600
         prose-td:px-4 prose-td:py-2 prose-td:border-t prose-td:border-gray-100
         prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:text-blue-800 prose-blockquote:not-italic
-        prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+        prose-pre:bg-gray-50 prose-pre:text-gray-700 prose-pre:border prose-pre:border-gray-200
+        prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:text-gray-700
         prose-hr:border-gray-200 prose-hr:my-8
       ">
-        <ReactMarkdown>{manualContent}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{manualContent}</ReactMarkdown>
       </div>
     </div>
   );
