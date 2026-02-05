@@ -18,22 +18,34 @@ function getPayjp() {
 }
 
 /**
- * 8桁のユニークな企業コードを生成
+ * 8桁のユニークな企業コードを生成（連番）
  */
 async function generateUniqueCompanyCode() {
-  for (let i = 0; i < 10; i++) {
-    const code = String(Math.floor(10000000 + Math.random() * 90000000));
-    const snapshot = await db
-      .collection("companies")
-      .where("companyCode", "==", code)
-      .limit(1)
-      .get();
+  const START_CODE = 10000001; // 開始番号
 
-    if (snapshot.empty) {
-      return code;
-    }
+  // 既存の最大企業コードを取得
+  const snapshot = await db
+    .collection("companies")
+    .orderBy("companyCode", "desc")
+    .limit(1)
+    .get();
+
+  let nextCode;
+  if (snapshot.empty) {
+    // 初めての企業の場合は開始番号から
+    nextCode = START_CODE;
+  } else {
+    // 最大コード + 1
+    const maxCode = parseInt(snapshot.docs[0].data().companyCode, 10);
+    nextCode = maxCode + 1;
   }
-  throw new HttpsError("internal", "企業コードの生成に失敗しました。しばらくしてから再度お試しください。");
+
+  // 8桁を超えないかチェック
+  if (nextCode > 99999999) {
+    throw new HttpsError("internal", "企業コードが上限に達しました。");
+  }
+
+  return String(nextCode);
 }
 
 /**

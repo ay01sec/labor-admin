@@ -169,13 +169,16 @@ export default function Login() {
           </Link>
         </div>
 
-        {/* 新規利用 */}
-        <div className="mt-4 text-center">
+        {/* 新規利用開始 */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-center text-sm text-gray-500 mb-3">
+            まだアカウントをお持ちでない方
+          </p>
           <Link
             to="/register"
-            className="text-sm text-gray-500 hover:text-blue-600"
+            className="block w-full text-center py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"
           >
-            新規利用はこちら
+            新規利用開始
           </Link>
         </div>
 
