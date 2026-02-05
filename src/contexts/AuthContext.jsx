@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -48,6 +48,7 @@ export function AuthProvider({ children }) {
   const [pending2FAUser, setPending2FAUser] = useState(null);
   const [pending2FACompany, setPending2FACompany] = useState(null);
   const [twoFAVerified, setTwoFAVerified] = useState(false);
+  const is2FAPendingRef = useRef(false); // refでも追跡
 
   // 企業コードで企業を検索（未認証でも可能）
   async function findCompanyByCode(companyCode) {
@@ -130,6 +131,7 @@ export function AuthProvider({ children }) {
           user: { id: user.uid, ...userData },
           company: company
         };
+        is2FAPendingRef.current = true; // refを先に更新
         setPending2FAUser(pending2FAData.user);
         setPending2FACompany(pending2FAData.company);
         setRequires2FA(true);
@@ -305,6 +307,7 @@ export function AuthProvider({ children }) {
     await verify2FACodeFn({ code });
 
     // 検証成功 - ログイン完了処理
+    is2FAPendingRef.current = false; // refをリセット
     setTwoFAVerified(true);
     setRequires2FA(false);
 
@@ -325,6 +328,7 @@ export function AuthProvider({ children }) {
 
   // カスタム2FA: キャンセル（ログアウト）
   async function cancel2FA() {
+    is2FAPendingRef.current = false; // refをリセット
     setPending2FAUser(null);
     setPending2FACompany(null);
     setRequires2FA(false);
@@ -413,8 +417,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      
+
       if (user) {
+        // 2FA認証待ちの場合はfetchUserInfoをスキップ
+        if (is2FAPendingRef.current) {
+          console.log('2FA pending, skipping fetchUserInfo');
+          setLoading(false);
+          return;
+        }
+
         try {
           await fetchUserInfo(user.uid);
         } catch (error) {
