@@ -13,6 +13,9 @@
 | 認証 | Firebase Authentication |
 | ストレージ | Firebase Storage |
 | ホスティング | Firebase Hosting |
+| バックエンド | Firebase Cloud Functions (Node.js 20) |
+| 決済 | PAY.JP |
+| メール送信 | Nodemailer (SMTP) |
 | フォーム | React Hook Form |
 | 通知 | React Hot Toast |
 | アイコン | lucide-react |
@@ -23,19 +26,25 @@
 # 依存関係のインストール
 npm install
 
+# Cloud Functions の依存関係
+cd functions && npm install && cd ..
+
 # 開発サーバー起動
 npm run dev
 
 # ビルド
 npm run build
 
-# デプロイ
-npm run build && npx firebase deploy --only hosting
+# デプロイ（ホスティング）
+firebase deploy --only hosting
+
+# デプロイ（Cloud Functions）
+firebase deploy --only functions
 ```
 
 ## 環境変数
 
-`.env` ファイルに Firebase の設定情報を記載してください。
+### フロントエンド（`.env`）
 
 ```
 VITE_FIREBASE_API_KEY=
@@ -44,6 +53,18 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
+VITE_PAYJP_PUBLIC_KEY=pk_test_xxxx
+```
+
+### Cloud Functions（`functions/.env`）
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+ADMIN_URL=https://your-app.web.app
+PAYJP_SECRET_KEY=sk_test_xxxx
 ```
 
 ---
@@ -55,6 +76,37 @@ VITE_FIREBASE_APP_ID=
 | admin（管理者） | 全機能にアクセス可能 | 全ページ・全操作 |
 | manager（マネージャー） | 日報承認・閲覧が可能 | ダッシュボード・日報・マスタ閲覧 |
 | worker（ワーカー） | 管理画面へのログイン不可 | 日報アプリのみ利用可能 |
+
+---
+
+## 新規利用開始（`/register`）
+
+新規企業の登録を行う3ステップのウィザード形式画面です。
+
+### ステップ1: 会社情報の入力
+
+| 項目 | 必須 | 説明 |
+|------|------|------|
+| 会社名 | 必須 | 企業名 |
+| 支店名 | 任意 | 支店・部署名 |
+| 代表者名 | 任意 | 代表者氏名 |
+| 郵便番号 | 任意 | ハイフンなし7桁 |
+| 都道府県〜建物名 | 任意 | 所在地 |
+| TEL / FAX / Email | 任意 | 連絡先 |
+
+### ステップ2: 管理者ユーザーの入力
+
+| 項目 | 必須 | 説明 |
+|------|------|------|
+| メールアドレス | 必須 | ログイン用メールアドレス |
+| 表示名 | 必須 | ユーザー名（日報の作成者名等に使用） |
+| パスワード | 必須 | 6文字以上 |
+
+### ステップ3: 登録完了
+
+- 8桁の企業コードが自動生成・表示される
+- ウェルカムメールが送信される（SMTP設定時）
+- 30日間の無料トライアル期間が開始
 
 ---
 
@@ -88,8 +140,9 @@ VITE_FIREBASE_APP_ID=
 
 **一覧画面の機能:**
 - 氏名・フリガナでの検索
-- 雇用形態フィルター（正社員/契約社員/パート/アルバイト）
+- 雇用形態フィルター（カスタマイズ可能）
 - 状態フィルター（在籍/退職）
+- 一括変更機能（雇用形態・在籍状態）
 - ページネーション（10件/ページ）
 - CSVインポート/エクスポート
 
@@ -163,7 +216,7 @@ VITE_FIREBASE_APP_ID=
 
 ### 勤怠集計（`/reports/attendance`）
 
-月別の従業員勤怠データを集計・表示します（現在非公開）。
+月別の従業員勤怠データを集計・表示します。
 
 - 月選択（直近12ヶ月）
 - 従業員別集計: 出勤日数・総労働時間・昼休憩なし日数
@@ -188,8 +241,8 @@ VITE_FIREBASE_APP_ID=
 | 権限 | できること |
 |------|-----------|
 | 管理者 | 全機能の利用（社員管理、ユーザー管理、設定変更など） |
-| マネージャー | 日報の承認・却下、一部の管理機能 |
-| ワーカー | 日報アプリからの日報入力のみ |
+| マネージャー | 日報の承認・却下、マスタデータの閲覧 |
+| ワーカー | 日報アプリからの日報入力のみ（管理画面ログイン不可） |
 
 #### 自社情報設定（`/settings`）- 管理者のみ
 
@@ -197,10 +250,50 @@ VITE_FIREBASE_APP_ID=
 
 | タブ | 設定内容 |
 |------|----------|
-| 会社情報 | 企業コード・会社名・支店名・代表者名・住所・連絡先・インボイス番号 |
-| 口座・退職金 | 銀行情報（銀行名・支店名・口座種別・口座番号・名義）・退職金制度 |
-| 日報・承認 | 日報締切時刻・承認モード（手動/自動）・自動承認メール送信先・通知設定 |
-| 勤怠設定 | 昼休憩の稼働時間控除（する/しない）・昼休憩時間（30/45/60/90分） |
+| 会社情報 | 企業コード・会社名・支店名・代表者名・住所・連絡先・インボイス番号・解約 |
+| 銀行情報 | 銀行名・支店名・口座種別・口座番号・名義・退職金制度 |
+| 決済情報 | 支払い方法（カード/請求書）・カード登録・請求書払い申請・料金プラン |
+| 通知設定 | 日報締切時刻・リマインダー通知 |
+| 承認設定 | 承認モード（手動/自動）・自動承認メール送信先 |
+| 勤怠設定 | 昼休憩の稼働時間控除（する/しない）・昼休憩時間 |
+| 雇用形態 | 雇用形態の追加・編集・削除・色設定 |
+
+---
+
+### 決済情報設定
+
+PAY.JPを利用したクレジットカード決済と請求書払いに対応しています。
+
+**請求ステータス:**
+| ステータス | 説明 |
+|-----------|------|
+| トライアル | 無料トライアル期間（30日間） |
+| アクティブ | 支払い設定完了、利用可能 |
+| 解約済み | サービス利用停止 |
+
+**支払い方法:**
+- **クレジットカード**: PAY.JP経由でカード登録。カード情報は下4桁とブランドのみ保存
+- **請求書払い**: 担当者名・請求先住所・備考を入力して申請
+
+---
+
+### 解約機能
+
+会社情報タブの最下部から解約手続きが可能です。
+
+- 解約には会社名の入力による確認が必要
+- 解約後は全機能が利用停止（ログイン後に停止画面を表示）
+- 管理者のみ実行可能
+
+---
+
+### 雇用形態カスタマイズ
+
+自社情報設定の「雇用形態」タブから、雇用形態を自由にカスタマイズできます。
+
+- 雇用形態の追加・編集・削除
+- ラベルと色（8色から選択）を設定
+- デフォルト: 正社員・契約社員・パート・アルバイト・外部
 
 ---
 
@@ -234,6 +327,19 @@ VITE_FIREBASE_APP_ID=
 
 ---
 
+## Cloud Functions
+
+バックエンド処理は Firebase Cloud Functions で実装されています。
+
+| 関数名 | 説明 |
+|--------|------|
+| `registerCompany` | 新規企業登録（企業コード生成・Auth/Firestore作成・メール送信） |
+| `registerCard` | PAY.JPカード登録（顧客作成・カード追加） |
+| `requestInvoicePayment` | 請求書払い申請 |
+| `cancelCompany` | 企業解約処理 |
+
+---
+
 ## レスポンシブ対応
 
 768px未満のモバイル表示に対応しています。
@@ -258,6 +364,13 @@ companies/{companyId}
 ├── invoiceNumber, bankInfo, retirementSystem
 ├── reportDeadline, approvalSettings, notificationSettings
 ├── attendanceSettings (deductLunchBreak, lunchBreakMinutes)
+├── employmentTypes[] (id, label, color, isDefault)
+├── billing
+│   ├── status (trial/active/canceled)
+│   ├── paymentMethod (card/invoice/null)
+│   ├── payjpCustomerId, cardLast4, cardBrand
+│   ├── trialEndsAt, canceledAt
+│   └── invoiceRequest (contactName, billingAddress, note)
 │
 ├── users/{userId}
 │   ├── email, displayName, role, employeeId
