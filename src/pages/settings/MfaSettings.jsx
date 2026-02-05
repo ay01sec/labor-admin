@@ -70,9 +70,28 @@ export default function MfaSettings() {
   useEffect(() => {
     if (showSmsForm && !recaptchaVerifierRef.current) {
       recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container-mfa', {
-        size: 'invisible'
+        size: 'normal',
+        callback: () => {
+          console.log('reCAPTCHA verified');
+        },
+        'expired-callback': () => {
+          console.log('reCAPTCHA expired');
+          recaptchaVerifierRef.current = null;
+        }
       });
+      recaptchaVerifierRef.current.render();
     }
+
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          // ignore
+        }
+        recaptchaVerifierRef.current = null;
+      }
+    };
   }, [showSmsForm]);
 
   const handleSendSmsCode = async () => {
@@ -86,9 +105,8 @@ export default function MfaSettings() {
 
     try {
       if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container-mfa', {
-          size: 'invisible'
-        });
+        setError('reCAPTCHAが読み込まれていません。ページを再読み込みしてください。');
+        return;
       }
 
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+81${phoneNumber.replace(/^0/, '')}`;
@@ -433,6 +451,10 @@ export default function MfaSettings() {
                   日本の電話番号を入力してください（例: 090-1234-5678）
                 </p>
               </div>
+              {/* reCAPTCHA */}
+              <div className="flex justify-center my-4">
+                <div id="recaptcha-container-mfa" ref={recaptchaContainerRef}></div>
+              </div>
               <div className="flex space-x-3">
                 <button
                   onClick={handleSendSmsCode}
@@ -493,8 +515,6 @@ export default function MfaSettings() {
               </div>
             </div>
           )}
-
-          <div id="recaptcha-container-mfa" ref={recaptchaContainerRef}></div>
         </div>
       )}
 
