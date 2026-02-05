@@ -21,7 +21,7 @@ function getPayjp() {
  * 8桁のユニークな企業コードを生成（連番）
  */
 async function generateUniqueCompanyCode() {
-  const START_CODE = 10000001; // 開始番号
+  const START_CODE = 10000001; // 開始番号（8桁）
 
   // 既存の最大企業コードを取得
   const snapshot = await db
@@ -35,9 +35,9 @@ async function generateUniqueCompanyCode() {
     // 初めての企業の場合は開始番号から
     nextCode = START_CODE;
   } else {
-    // 最大コード + 1
+    // 最大コード + 1（ただし開始番号未満の場合は開始番号を使用）
     const maxCode = parseInt(snapshot.docs[0].data().companyCode, 10);
-    nextCode = maxCode + 1;
+    nextCode = Math.max(maxCode + 1, START_CODE);
   }
 
   // 8桁を超えないかチェック
