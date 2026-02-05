@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>建設業向け 日報・労務管理クラウド｜現場DXをこの1本で</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .hero-bg {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    }
+    .card-hover { transition: transform .2s, box-shadow .2s; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,.12); }
+    .fade-in { animation: fadeIn .6s ease-out both; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:none; } }
+    .number-circle {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1.25rem; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body class="bg-white text-gray-800 font-sans">
+
+  <!-- ===== HEADER ===== -->
+  <header class="fixed top-0 w-full bg-white/90 backdrop-blur shadow-sm z-50">
+    <div class="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
+      <span class="text-lg font-bold text-blue-900 tracking-wide">現場クラウド</span>
+      <nav class="hidden md:flex gap-6 text-sm text-gray-600">
+        <a href="#problems" class="hover:text-blue-600">課題</a>
+        <a href="#solution" class="hover:text-blue-600">サービス概要</a>
+        <a href="#features" class="hover:text-blue-600">機能</a>
+        <a href="#flow" class="hover:text-blue-600">導入フロー</a>
+        <a href="#faq" class="hover:text-blue-600">FAQ</a>
+      </nav>
+      <a href="#cta" class="bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-5 py-2 rounded-full transition">お問い合わせ</a>
+    </div>
+  </header>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero-bg pt-32 pb-20 md:pt-40 md:pb-28 text-center text-white px-4">
+    <p class="text-orange-300 text-sm font-semibold tracking-widest mb-4">建設・土木業に特化したクラウドサービス</p>
+    <h1 class="text-3xl md:text-5xl font-extrabold leading-tight mb-6">
+      日報も、労務も、勤怠も。<br class="hidden md:block" />
+      <span class="text-orange-400">現場のDXをこの1本で。</span>
+    </h1>
+    <p class="max-w-2xl mx-auto text-blue-200 mb-10 leading-relaxed">
+      スマホで日報作成 &rarr; 管理画面でワンクリック承認 &rarr; 勤怠自動集計。<br />
+      紙・Excel 業務から解放され、月末の集計時間を大幅に削減します。
+    </p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="#cta" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 py-3 rounded-full text-lg transition">無料で相談する</a>
+      <a href="#solution" class="border border-white/40 hover:bg-white/10 text-white font-semibold px-8 py-3 rounded-full text-lg transition">サービスを見る</a>
+    </div>
+  </section>
+
+  <!-- ===== 数字で見る導入効果 ===== -->
+  <section class="bg-blue-50 py-14">
+    <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center px-4">
+      <div>
+        <p class="text-3xl md:text-4xl font-extrabold text-blue-700">80<span class="text-lg">%</span></p>
+        <p class="text-sm text-gray-600 mt-1">日報作成時間の削減</p>
+      </div>
+      <div>
+        <p class="text-3xl md:text-4xl font-extrabold text-blue-700">0<span class="text-lg">枚</span></p>
+        <p class="text-sm text-gray-600 mt-1">紙の日報が不要に</p>
+      </div>
+      <div>
+        <p class="text-3xl md:text-4xl font-extrabold text-blue-700">1<span class="text-lg">クリック</span></p>
+        <p class="text-sm text-gray-600 mt-1">日報承認・CSV出力</p>
+      </div>
+      <div>
+        <p class="text-3xl md:text-4xl font-extrabold text-blue-700">100<span class="text-lg">%</span></p>
+        <p class="text-sm text-gray-600 mt-1">ペーパーレス化を実現</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 課題 ===== -->
+  <section id="problems" class="py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center mb-12">
+      <p class="text-blue-600 font-semibold text-sm mb-2">PROBLEM</p>
+      <h2 class="text-2xl md:text-3xl font-bold">こんなお悩み、ありませんか？</h2>
+    </div>
+    <div class="max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
+      <div class="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
+        <p class="font-bold text-red-700 mb-1">紙の日報を事務所に届けるのが手間</p>
+        <p class="text-sm text-gray-600">現場から事務所へFAXや手渡し。移動時間も人件費もかかっている。</p>
+      </div>
+      <div class="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
+        <p class="font-bold text-red-700 mb-1">月末の勤怠集計にまる1日かかる</p>
+        <p class="text-sm text-gray-600">日報からExcelに手作業で転記。ミスが発生し、残業が増える。</p>
+      </div>
+      <div class="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
+        <p class="font-bold text-red-700 mb-1">得意先の署名をもらい忘れる</p>
+        <p class="text-sm text-gray-600">紙だと署名が漏れやすく、後日まとめて回収する手間が発生する。</p>
+      </div>
+      <div class="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
+        <p class="font-bold text-red-700 mb-1">社員情報がバラバラに管理されている</p>
+        <p class="text-sm text-gray-600">資格・免許・保険情報がExcel・紙・個人任せで期限切れに気づけない。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ソリューション概要 ===== -->
+  <section id="solution" class="bg-gray-50 py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center mb-14">
+      <p class="text-blue-600 font-semibold text-sm mb-2">SOLUTION</p>
+      <h2 class="text-2xl md:text-3xl font-bold">2つのアプリで、現場と事務所をシームレスにつなぐ</h2>
+    </div>
+    <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
+      <!-- 日報アプリ -->
+      <div class="bg-white rounded-2xl shadow-lg p-8 card-hover">
+        <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-2xl font-bold mb-4">&#9997;</div>
+        <h3 class="text-xl font-bold mb-2">日報アプリ <span class="text-sm font-normal text-gray-500">（現場作業員向け）</span></h3>
+        <p class="text-gray-600 text-sm mb-4">スマホ1台で日報入力・写真添付・得意先署名・提出まで完結するPWAアプリ。</p>
+        <ul class="space-y-2 text-sm text-gray-700">
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 写真を最大3枚添付（現場状況を記録）</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> スマホ上で得意先の電子署名を取得</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> プッシュ通知で却下・承認をリアルタイム通知</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> ホーム画面追加でネイティブアプリのように使える</li>
+        </ul>
+      </div>
+      <!-- 労務管理 -->
+      <div class="bg-white rounded-2xl shadow-lg p-8 card-hover">
+        <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-2xl font-bold mb-4">&#128202;</div>
+        <h3 class="text-xl font-bold mb-2">労務管理システム <span class="text-sm font-normal text-gray-500">（管理者向け）</span></h3>
+        <p class="text-gray-600 text-sm mb-4">日報承認・勤怠集計・社員マスタ管理を一画面で完結するWebダッシュボード。</p>
+        <ul class="space-y-2 text-sm text-gray-700">
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 日報のワンクリック承認・却下（理由入力付き）</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 勤怠の月別自動集計（昼休憩控除対応）</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> CSV / PDFの一括エクスポート</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 社員・取引先・現場のマスタ一元管理</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> ロール別の権限管理（管理者/マネージャー）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 機能ハイライト ===== -->
+  <section id="features" class="py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center mb-14">
+      <p class="text-blue-600 font-semibold text-sm mb-2">FEATURES</p>
+      <h2 class="text-2xl md:text-3xl font-bold">建設業の現場に合わせた機能</h2>
+    </div>
+    <div class="max-w-5xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Feature cards -->
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#128247;</div>
+        <h4 class="font-bold mb-1">写真付き日報</h4>
+        <p class="text-sm text-gray-600">現場写真を最大3枚添付。工事の進捗を写真で管理でき、報告の質が向上します。</p>
+      </div>
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#9999;&#65039;</div>
+        <h4 class="font-bold mb-1">電子署名</h4>
+        <p class="text-sm text-gray-600">得意先の署名をスマホの画面上で取得。署名のもらい忘れを防止できます。</p>
+      </div>
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#128276;</div>
+        <h4 class="font-bold mb-1">プッシュ通知</h4>
+        <p class="text-sm text-gray-600">日報の承認・却下をリアルタイムで作業員に通知。確認漏れを無くします。</p>
+      </div>
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#128200;</div>
+        <h4 class="font-bold mb-1">勤怠自動集計</h4>
+        <p class="text-sm text-gray-600">日報データから月別の勤怠を自動集計。昼休憩の控除計算にも対応しています。</p>
+      </div>
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#128194;</div>
+        <h4 class="font-bold mb-1">CSV / PDF出力</h4>
+        <p class="text-sm text-gray-600">日報や勤怠データをCSV・PDFで一括出力。既存の給与ソフトとの連携も容易です。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 運用フロー ===== -->
+  <section id="flow" class="bg-gray-50 py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center mb-14">
+      <p class="text-blue-600 font-semibold text-sm mb-2">HOW IT WORKS</p>
+      <h2 class="text-2xl md:text-3xl font-bold">かんたん3ステップ</h2>
+    </div>
+    <div class="max-w-3xl mx-auto space-y-8">
+      <div class="flex items-start gap-5">
+        <div class="number-circle bg-blue-600 text-white">1</div>
+        <div>
+          <h4 class="font-bold text-lg">現場でスマホ入力</h4>
+          <p class="text-sm text-gray-600 mt-1">作業員がスマホで日報を入力。天候・現場名・作業内容・写真・署名をその場で記録。アプリのインストール不要で、ブラウザから即利用可能です。</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-5">
+        <div class="number-circle bg-blue-600 text-white">2</div>
+        <div>
+          <h4 class="font-bold text-lg">管理画面で承認</h4>
+          <p class="text-sm text-gray-600 mt-1">事務所の管理者がPCで日報を確認し、ワンクリックで承認または却下。却下理由も記録でき、作業員に自動通知されます。</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-5">
+        <div class="number-circle bg-blue-600 text-white">3</div>
+        <div>
+          <h4 class="font-bold text-lg">自動集計 &amp; エクスポート</h4>
+          <p class="text-sm text-gray-600 mt-1">承認済み日報から勤怠が自動集計。月末のCSV・PDF一括出力で、給与計算や元請提出書類をすぐに作成できます。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 比較表 ===== -->
+  <section class="py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center mb-14">
+      <p class="text-blue-600 font-semibold text-sm mb-2">COMPARISON</p>
+      <h2 class="text-2xl md:text-3xl font-bold">従来の方法との違い</h2>
+    </div>
+    <div class="max-w-3xl mx-auto overflow-x-auto">
+      <table class="w-full text-sm border-collapse">
+        <thead>
+          <tr class="bg-blue-900 text-white">
+            <th class="py-3 px-4 text-left rounded-tl-lg">項目</th>
+            <th class="py-3 px-4 text-center">紙 / Excel 管理</th>
+            <th class="py-3 px-4 text-center rounded-tr-lg bg-orange-500">現場クラウド</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          <tr class="bg-gray-50">
+            <td class="py-3 px-4 font-medium">日報提出</td>
+            <td class="py-3 px-4 text-center text-gray-500">FAX / 手渡し</td>
+            <td class="py-3 px-4 text-center font-semibold text-blue-700">スマホでその場で提出</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-4 font-medium">署名取得</td>
+            <td class="py-3 px-4 text-center text-gray-500">紙に手書き</td>
+            <td class="py-3 px-4 text-center font-semibold text-blue-700">スマホで電子署名</td>
+          </tr>
+          <tr class="bg-gray-50">
+            <td class="py-3 px-4 font-medium">勤怠集計</td>
+            <td class="py-3 px-4 text-center text-gray-500">Excel手作業</td>
+            <td class="py-3 px-4 text-center font-semibold text-blue-700">自動集計・CSV出力</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-4 font-medium">写真管理</td>
+            <td class="py-3 px-4 text-center text-gray-500">メール / USB</td>
+            <td class="py-3 px-4 text-center font-semibold text-blue-700">日報に直接添付</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section id="faq" class="bg-gray-50 py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center mb-14">
+      <p class="text-blue-600 font-semibold text-sm mb-2">FAQ</p>
+      <h2 class="text-2xl md:text-3xl font-bold">よくあるご質問</h2>
+    </div>
+    <div class="max-w-3xl mx-auto space-y-4">
+      <details class="bg-white rounded-lg shadow-sm p-5 group">
+        <summary class="font-semibold cursor-pointer list-none flex justify-between items-center">
+          アプリのインストールは必要ですか？
+          <span class="text-blue-500 group-open:rotate-180 transition-transform text-xl">&#9660;</span>
+        </summary>
+        <p class="text-sm text-gray-600 mt-3">いいえ。PWA（Progressive Web App）のため、ブラウザからアクセスするだけで利用可能です。ホーム画面に追加すれば、ネイティブアプリのように使えます。</p>
+      </details>
+      <details class="bg-white rounded-lg shadow-sm p-5 group">
+        <summary class="font-semibold cursor-pointer list-none flex justify-between items-center">
+          既存の給与ソフトとの連携はできますか？
+          <span class="text-blue-500 group-open:rotate-180 transition-transform text-xl">&#9660;</span>
+        </summary>
+        <p class="text-sm text-gray-600 mt-3">勤怠データをCSV形式でエクスポートできるため、多くの給与計算ソフトにインポートして連携可能です。</p>
+      </details>
+      <details class="bg-white rounded-lg shadow-sm p-5 group">
+        <summary class="font-semibold cursor-pointer list-none flex justify-between items-center">
+          セキュリティは大丈夫ですか？
+          <span class="text-blue-500 group-open:rotate-180 transition-transform text-xl">&#9660;</span>
+        </summary>
+        <p class="text-sm text-gray-600 mt-3">Firebase Authenticationによる認証と、ロールベースのアクセス制御を実装しています。企業ごとにデータが分離されており、他社のデータにアクセスすることはできません。</p>
+      </details>
+      <details class="bg-white rounded-lg shadow-sm p-5 group">
+        <summary class="font-semibold cursor-pointer list-none flex justify-between items-center">
+          導入に必要なものは何ですか？
+          <span class="text-blue-500 group-open:rotate-180 transition-transform text-xl">&#9660;</span>
+        </summary>
+        <p class="text-sm text-gray-600 mt-3">現場作業員はスマートフォン（iOS/Android）、管理者はPCのブラウザがあれば利用可能です。専用機器やソフトのインストールは不要です。</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section id="cta" class="hero-bg py-20 px-4 text-center text-white">
+    <h2 class="text-2xl md:text-3xl font-bold mb-4">まずは無料でご相談ください</h2>
+    <p class="text-blue-200 mb-10 max-w-xl mx-auto">導入に関するご質問やデモのご依頼など、お気軽にお問い合わせください。<br />貴社の業務に合わせた最適な運用方法をご提案いたします。</p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="mailto:contact@example.com" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-10 py-4 rounded-full text-lg transition">お問い合わせはこちら</a>
+      <a href="#solution" class="border border-white/40 hover:bg-white/10 text-white font-semibold px-10 py-4 rounded-full text-lg transition">機能を詳しく見る</a>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="bg-gray-900 text-gray-400 text-sm py-8 px-4 text-center">
+    <p>&copy; 2026 現場クラウド All rights reserved.</p>
+  </footer>
+
+</body>
+</html>
