@@ -1,5 +1,5 @@
 // src/pages/settings/CompanySettings.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   doc,
@@ -7,7 +7,10 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { db, functions } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import {
   Save,
   Settings,
@@ -24,8 +27,115 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import { DEFAULT_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_COLORS } from '../../constants/employmentTypes';
+
+// Stripe公開キー
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+  : null;
+
+// カードブランドの表示名
+const CARD_BRAND_LABELS = {
+  visa: 'Visa',
+  mastercard: 'Mastercard',
+  amex: 'American Express',
+  discover: 'Discover',
+  diners: 'Diners Club',
+  jcb: 'JCB',
+  unionpay: 'UnionPay',
+};
+
+// Stripe CardElementの内部コンポーネント
+function CardRegistrationForm({ companyId, onSuccess, onError }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [cardError, setCardError] = useState('');
+
+  const handleCardSubmit = async () => {
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    setCardError('');
+
+    try {
+      // 1. SetupIntent取得
+      const createSetupIntent = httpsCallable(functions, 'createSetupIntent');
+      const { data } = await createSetupIntent({ companyId });
+
+      // 2. カード確認
+      const { error, setupIntent } = await stripe.confirmCardSetup(data.clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement),
+        },
+      });
+
+      if (error) {
+        setCardError(error.message);
+        return;
+      }
+
+      // 3. バックエンドで確認処理
+      const confirmPaymentMethod = httpsCallable(functions, 'confirmPaymentMethod');
+      const result = await confirmPaymentMethod({
+        companyId,
+        setupIntentId: setupIntent.id,
+      });
+
+      onSuccess(result.data);
+    } catch (err) {
+      console.error('カード登録エラー:', err);
+      setCardError(err.message || 'カード登録に失敗しました');
+      onError?.(err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-gray-300 rounded-lg p-4 bg-white">
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': { color: '#aab7c4' },
+              },
+              invalid: { color: '#9e2146' },
+            },
+            hidePostalCode: true,
+          }}
+        />
+      </div>
+      {cardError && (
+        <p className="text-sm text-red-600">{cardError}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleCardSubmit}
+        disabled={!stripe || processing}
+        className="inline-flex items-center space-x-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {processing ? (
+          <>
+            <Loader2 size={18} className="animate-spin" />
+            <span>処理中...</span>
+          </>
+        ) : (
+          <>
+            <CreditCard size={18} />
+            <span>カードを登録</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
 
 export default function CompanySettings() {
   const { companyId, isAdmin } = useAuth();
@@ -185,9 +295,110 @@ export default function CompanySettings() {
     }
   };
 
+  // 決済情報の状態
+  const [billing, setBilling] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
+  const [invoiceForm, setInvoiceForm] = useState({
+    contactName: '',
+    billingAddress: '',
+    note: '',
+  });
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
+
+  // 解約モーダル
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelConfirmName, setCancelConfirmName] = useState('');
+  const [canceling, setCanceling] = useState(false);
+
+  // billing情報の取得
+  const fetchBilling = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      const docRef = doc(db, 'companies', companyId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setBilling(data.billing || null);
+        if (data.billing?.invoiceRequest) {
+          setInvoiceForm({
+            contactName: data.billing.invoiceRequest.contactName || '',
+            billingAddress: data.billing.invoiceRequest.billingAddress || '',
+            note: data.billing.invoiceRequest.note || '',
+          });
+        }
+        if (data.billing?.paymentMethod) {
+          setSelectedPaymentMethod(data.billing.paymentMethod);
+        }
+      }
+    } catch (err) {
+      console.error('billing取得エラー:', err);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    fetchBilling();
+  }, [fetchBilling]);
+
+  // 請求書払い申請
+  const handleInvoiceSubmit = async () => {
+    if (!invoiceForm.contactName.trim()) {
+      setError('担当者名は必須です');
+      return;
+    }
+
+    setInvoiceSubmitting(true);
+    setError('');
+
+    try {
+      const requestInvoicePayment = httpsCallable(functions, 'requestInvoicePayment');
+      await requestInvoicePayment({
+        companyId,
+        invoiceRequest: invoiceForm,
+      });
+      setSuccess('請求書払いの申請が完了しました');
+      setTimeout(() => setSuccess(''), 3000);
+      await fetchBilling();
+    } catch (err) {
+      console.error('請求書払い申請エラー:', err);
+      setError(err.message || '請求書払いの申請に失敗しました');
+    } finally {
+      setInvoiceSubmitting(false);
+    }
+  };
+
+  // カード登録成功時
+  const handleCardSuccess = async () => {
+    setSuccess('クレジットカードを登録しました');
+    setTimeout(() => setSuccess(''), 3000);
+    await fetchBilling();
+  };
+
+  // 解約処理
+  const handleCancelCompany = async () => {
+    if (cancelConfirmName !== formData.companyName) return;
+
+    setCanceling(true);
+    setError('');
+
+    try {
+      const cancelCompany = httpsCallable(functions, 'cancelCompany');
+      await cancelCompany({ companyId });
+      setShowCancelModal(false);
+      // companyInfoを再取得して解約済み画面を表示させる
+      window.location.reload();
+    } catch (err) {
+      console.error('解約エラー:', err);
+      setError(err.message || '解約処理に失敗しました');
+    } finally {
+      setCanceling(false);
+    }
+  };
+
   const tabs = [
     { id: 'company', label: '会社情報', icon: Building },
     { id: 'bank', label: '銀行情報', icon: CreditCard },
+    { id: 'billing', label: '決済情報', icon: FileText },
     { id: 'notification', label: '通知設定', icon: Bell },
     { id: 'approval', label: '承認設定', icon: ClipboardCheck },
     { id: 'attendance', label: '勤怠設定', icon: Clock },
@@ -574,6 +785,34 @@ export default function CompanySettings() {
                   )}
                 </div>
               </div>
+
+              <hr />
+
+              {/* 解約 */}
+              <div>
+                <h2 className="text-lg font-semibold text-red-600 mb-4">解約</h2>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                    <div>
+                      <p className="text-sm text-red-700 font-medium">
+                        解約すると全ての機能が利用できなくなります。
+                      </p>
+                      <p className="text-sm text-red-600 mt-1">
+                        社員情報・日報データ・設定など、全てのデータにアクセスできなくなります。この操作は取り消せません。
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelModal(true)}
+                        className="mt-4 inline-flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                      >
+                        <X size={16} />
+                        <span>解約する</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -908,6 +1147,221 @@ export default function CompanySettings() {
             </div>
           )}
 
+          {/* 決済情報タブ */}
+          {activeTab === 'billing' && (
+            <div className="space-y-8">
+              {/* ご利用状況 */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">ご利用状況</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <span className="text-sm font-medium text-gray-600">ステータス:</span>
+                    {billing?.status === 'trial' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                        無料トライアル中
+                      </span>
+                    )}
+                    {billing?.status === 'active' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        アクティブ
+                      </span>
+                    )}
+                    {billing?.status === 'past_due' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                        支払い遅延
+                      </span>
+                    )}
+                    {billing?.status === 'canceled' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                        キャンセル済み
+                      </span>
+                    )}
+                    {!billing?.status && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                        未設定
+                      </span>
+                    )}
+                  </div>
+                  {billing?.trialEndsAt && (
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm font-medium text-gray-600">トライアル期間:</span>
+                      <span className="text-sm text-gray-800">
+                        {billing.trialEndsAt.toDate
+                          ? `〜 ${billing.trialEndsAt.toDate().toLocaleDateString('ja-JP')}`
+                          : ''}
+                      </span>
+                    </div>
+                  )}
+                  {billing?.paymentMethod === 'card' && billing?.cardLast4 && (
+                    <div className="flex items-center space-x-3 mt-3">
+                      <span className="text-sm font-medium text-gray-600">登録カード:</span>
+                      <span className="text-sm text-gray-800">
+                        {CARD_BRAND_LABELS[billing.cardBrand] || billing.cardBrand} **** {billing.cardLast4}
+                      </span>
+                    </div>
+                  )}
+                  {billing?.paymentMethod === 'invoice' && (
+                    <div className="flex items-center space-x-3 mt-3">
+                      <span className="text-sm font-medium text-gray-600">支払い方法:</span>
+                      <span className="text-sm text-gray-800">請求書払い</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <hr />
+
+              {/* お支払い方法 */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">お支払い方法</h2>
+
+                {/* 支払い方法選択 */}
+                <div className="space-y-3 mb-6">
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    selectedPaymentMethod === 'card' ? 'border-blue-500 bg-blue-50' : ''
+                  }`}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="card"
+                      checked={selectedPaymentMethod === 'card'}
+                      onChange={() => setSelectedPaymentMethod('card')}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900 flex items-center space-x-2">
+                        <CreditCard size={18} />
+                        <span>クレジットカード</span>
+                      </span>
+                      <p className="text-sm text-gray-500 mt-1">Visa, Mastercard, JCB, American Express に対応</p>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    selectedPaymentMethod === 'invoice' ? 'border-blue-500 bg-blue-50' : ''
+                  }`}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="invoice"
+                      checked={selectedPaymentMethod === 'invoice'}
+                      onChange={() => setSelectedPaymentMethod('invoice')}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900 flex items-center space-x-2">
+                        <FileText size={18} />
+                        <span>請求書払い</span>
+                      </span>
+                      <p className="text-sm text-gray-500 mt-1">月末締め翌月末払いの請求書をお送りします</p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* クレジットカード登録フォーム */}
+                {selectedPaymentMethod === 'card' && (
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-sm font-medium text-gray-700 mb-4">カード情報の入力</h3>
+                    {stripePromise ? (
+                      <Elements stripe={stripePromise}>
+                        <CardRegistrationForm
+                          companyId={companyId}
+                          onSuccess={handleCardSuccess}
+                          onError={(err) => setError(err.message || 'カード登録に失敗しました')}
+                        />
+                      </Elements>
+                    ) : (
+                      <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg text-sm">
+                        <strong>設定が必要です:</strong> Stripe公開キー（VITE_STRIPE_PUBLISHABLE_KEY）が設定されていません。
+                        環境変数を設定してください。
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-4">
+                      ※ カード情報はStripe社により安全に管理されます。当社サーバーにカード番号は保存されません。
+                    </p>
+                  </div>
+                )}
+
+                {/* 請求書払い申請フォーム */}
+                {selectedPaymentMethod === 'invoice' && (
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-sm font-medium text-gray-700 mb-4">請求書払い申請</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          担当者名 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={invoiceForm.contactName}
+                          onChange={(e) => setInvoiceForm(prev => ({ ...prev, contactName: e.target.value }))}
+                          placeholder="経理太郎"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          請求先住所
+                        </label>
+                        <input
+                          type="text"
+                          value={invoiceForm.billingAddress}
+                          onChange={(e) => setInvoiceForm(prev => ({ ...prev, billingAddress: e.target.value }))}
+                          placeholder="東京都渋谷区..."
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          備考
+                        </label>
+                        <textarea
+                          value={invoiceForm.note}
+                          onChange={(e) => setInvoiceForm(prev => ({ ...prev, note: e.target.value }))}
+                          rows={3}
+                          placeholder="ご要望がありましたらご記入ください"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleInvoiceSubmit}
+                        disabled={invoiceSubmitting}
+                        className="inline-flex items-center space-x-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {invoiceSubmitting ? (
+                          <>
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>送信中...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileText size={18} />
+                            <span>請求書払いを申請</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <hr />
+
+              {/* 料金プラン */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">料金プラン</h2>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                  <div className="text-4xl mb-3">📋</div>
+                  <p className="text-gray-600 font-medium">料金プランは準備中です</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    詳細が決まり次第、こちらに表示されます。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 雇用形態タブ */}
           {activeTab === 'employmentType' && (
             <div className="space-y-6">
@@ -1007,6 +1461,71 @@ export default function CompanySettings() {
           )}
         </form>
       </div>
+
+      {/* 解約確認モーダル */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <AlertCircle className="text-red-600" size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">本当に解約しますか？</h2>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-700 font-medium mb-2">解約すると以下の影響があります:</p>
+              <ul className="text-sm text-red-600 space-y-1 list-disc list-inside">
+                <li>全ての管理機能が利用できなくなります</li>
+                <li>社員・取引先・現場のデータにアクセスできなくなります</li>
+                <li>日報の閲覧・承認ができなくなります</li>
+                <li>この操作は取り消せません</li>
+              </ul>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                確認のため、会社名「<span className="font-bold text-red-600">{formData.companyName}</span>」を入力してください
+              </label>
+              <input
+                type="text"
+                value={cancelConfirmName}
+                onChange={(e) => setCancelConfirmName(e.target.value)}
+                placeholder={formData.companyName}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              />
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelConfirmName('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelCompany}
+                disabled={cancelConfirmName !== formData.companyName || canceling}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {canceling ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>処理中...</span>
+                  </>
+                ) : (
+                  <span>解約を確定する</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
