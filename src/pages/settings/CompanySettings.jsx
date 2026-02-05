@@ -43,7 +43,7 @@ const CARD_BRAND_LABELS = {
   'JCB': 'JCB',
 };
 
-// PAY.JP カード入力コンポーネント
+// PAY.JP カード入力コンポーネント（3Dセキュア対応）
 function PayjpCardForm({ companyId, onSuccess, onError }) {
   const cardNumberRef = useRef(null);
   const cardExpiryRef = useRef(null);
@@ -53,11 +53,17 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState('');
   const [ready, setReady] = useState(false);
+  // 3Dセキュア用の追加フィールド
+  const [cardName, setCardName] = useState('');
+  const [cardEmail, setCardEmail] = useState('');
 
   useEffect(() => {
     if (!PAYJP_PUBLIC_KEY || !window.Payjp) return;
 
-    const payjp = window.Payjp(PAYJP_PUBLIC_KEY);
+    // 3Dセキュア対応: iframe ワークフローを指定
+    const payjp = window.Payjp(PAYJP_PUBLIC_KEY, {
+      threeDSecureWorkflow: 'iframe'
+    });
     payjpRef.current = payjp;
     const elements = payjp.elements();
 
@@ -96,12 +102,28 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   const handleCardSubmit = async () => {
     if (!payjpRef.current || !cardNumberElementRef.current) return;
 
+    // 3Dセキュア用のバリデーション
+    if (!cardName.trim()) {
+      setCardError('カード名義を入力してください');
+      return;
+    }
+    if (!cardEmail.trim()) {
+      setCardError('メールアドレスを入力してください');
+      return;
+    }
+
     setProcessing(true);
     setCardError('');
 
     try {
-      // 1. PAY.JPトークン作成
-      const response = await payjpRef.current.createToken(cardNumberElementRef.current);
+      // 1. PAY.JPトークン作成（3Dセキュア認証付き）
+      const response = await payjpRef.current.createToken(cardNumberElementRef.current, {
+        three_d_secure: true,
+        card: {
+          name: cardName.trim(),
+          email: cardEmail.trim(),
+        },
+      });
 
       if (response.error) {
         setCardError(response.error.message);
@@ -127,6 +149,34 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
 
   return (
     <div className="space-y-4">
+      {/* 3Dセキュア用: カード名義 */}
+      <div>
+        <label className="block text-sm font-medium text-gray-600 mb-1">
+          カード名義 <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={cardName}
+          onChange={(e) => setCardName(e.target.value.toUpperCase())}
+          placeholder="TARO YAMADA"
+          className="w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <p className="text-xs text-gray-500 mt-1">カードに記載されている名義を半角英字で入力</p>
+      </div>
+      {/* 3Dセキュア用: メールアドレス */}
+      <div>
+        <label className="block text-sm font-medium text-gray-600 mb-1">
+          メールアドレス <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="email"
+          value={cardEmail}
+          onChange={(e) => setCardEmail(e.target.value)}
+          placeholder="example@email.com"
+          className="w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <p className="text-xs text-gray-500 mt-1">3Dセキュア認証に使用します</p>
+      </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
         <div ref={cardNumberRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
@@ -144,6 +194,12 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       {cardError && (
         <p className="text-sm text-red-600">{cardError}</p>
       )}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <p className="text-xs text-blue-700">
+          <strong>3Dセキュア認証について:</strong> カード登録時に本人認証（3Dセキュア）が行われます。
+          カード発行会社の認証画面が表示される場合があります。
+        </p>
+      </div>
       <button
         type="button"
         onClick={handleCardSubmit}
@@ -153,7 +209,7 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
         {processing ? (
           <>
             <Loader2 size={18} className="animate-spin" />
-            <span>処理中...</span>
+            <span>認証中...</span>
           </>
         ) : (
           <>
