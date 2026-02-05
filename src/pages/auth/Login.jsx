@@ -48,6 +48,16 @@ export default function Login() {
   const [sending2FACode, setSending2FACode] = useState(false);
   const [devCode, setDevCode] = useState(null); // 開発用
 
+  // デバッグ: custom2FAStepの変化を監視
+  useEffect(() => {
+    console.log('custom2FAStep changed to:', custom2FAStep);
+  }, [custom2FAStep]);
+
+  // デバッグ: devCodeの変化を監視
+  useEffect(() => {
+    console.log('devCode changed to:', devCode);
+  }, [devCode]);
+
   // reCAPTCHA初期化
   useEffect(() => {
     if (mfaStep === 'sms' && recaptchaContainerRef.current && !recaptchaVerifierRef.current) {
@@ -205,11 +215,15 @@ export default function Login() {
       console.log('Calling send2FACode...');
       const result = await send2FACode(companyIdOverride);
       console.log('send2FACode result:', result);
+      console.log('Setting custom2FAStep to code...');
       setCustom2FAStep('code');
+      console.log('custom2FAStep set to code');
       // 開発用: SMTPが未設定の場合はコードを表示
       if (result.devCode) {
+        console.log('Setting devCode:', result.devCode);
         setDevCode(result.devCode);
       }
+      console.log('handleSendCustom2FACode completed successfully');
     } catch (err) {
       console.error('2FAコード送信エラー:', err);
       console.error('Error details:', err.code, err.message);
