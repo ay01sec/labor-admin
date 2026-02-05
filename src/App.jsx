@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
@@ -33,6 +33,7 @@ import UserDetail from './pages/users/UserDetail';
 // Settings Pages
 import CompanySettings from './pages/settings/CompanySettings';
 import NotificationSettings from './pages/settings/NotificationSettings';
+import MfaSettings from './pages/settings/MfaSettings';
 
 // Report Pages
 import ReportList from './pages/reports/ReportList';
@@ -52,8 +53,9 @@ const PlaceholderPage = ({ title }) => (
 );
 
 // 認証が必要なルート
-function PrivateRoute({ children }) {
-  const { currentUser, loading } = useAuth();
+function PrivateRoute({ children, skipMfaCheck = false }) {
+  const { currentUser, loading, requiresMfaSetup } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -63,7 +65,16 @@ function PrivateRoute({ children }) {
     );
   }
 
-  return currentUser ? children : <Navigate to="/login" />;
+  if (!currentUser) {
+    return <Navigate to="/login" />;
+  }
+
+  // 管理者でMFA未設定の場合、MFA設定ページにリダイレクト（MFA設定ページ自体は除外）
+  if (!skipMfaCheck && requiresMfaSetup() && location.pathname !== '/settings/mfa') {
+    return <Navigate to="/settings/mfa" replace />;
+  }
+
+  return children;
 }
 
 // 管理者専用ルート
@@ -153,6 +164,9 @@ function AppRoutes() {
         } />
         <Route path="/settings/notifications" element={
           <AdminRoute><NotificationSettings /></AdminRoute>
+        } />
+        <Route path="/settings/mfa" element={
+          <PrivateRoute skipMfaCheck><MfaSettings /></PrivateRoute>
         } />
 
         {/* ヘルプ */}

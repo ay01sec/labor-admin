@@ -4,7 +4,13 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  multiFactor,
+  getMultiFactorResolver,
+  PhoneAuthProvider,
+  PhoneMultiFactorGenerator,
+  TotpMultiFactorGenerator,
+  RecaptchaVerifier
 } from 'firebase/auth';
 import {
   collection,
@@ -30,6 +36,10 @@ export function AuthProvider({ children }) {
   const [companyId, setCompanyId] = useState(null);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  // MFA関連の状態
+  const [mfaResolver, setMfaResolver] = useState(null);
+  const [pendingCompany, setPendingCompany] = useState(null);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState(null);
 
   // 企業コードで企業を検索（未認証でも可能）
   async function findCompanyByCode(companyCode) {
@@ -53,12 +63,33 @@ export function AuthProvider({ children }) {
     // 1. 先に企業コードで企業を検索（未認証状態で検証）
     const company = await findCompanyByCode(companyCode);
 
-    // 2. Firebase Authenticationでログイン
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
     try {
-      // 3. その企業にユーザーが存在するか確認
+      // 2. Firebase Authenticationでログイン
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 3. ログイン後の処理
+      return await completeLogin(user, company);
+    } catch (error) {
+      // MFA認証が必要な場合
+      if (error.code === 'auth/multi-factor-auth-required') {
+        const resolver = getMultiFactorResolver(auth, error);
+        setMfaResolver(resolver);
+        setPendingCompany(company);
+        // MFA必要フラグを含むエラーを投げる
+        const mfaError = new Error('MFA認証が必要です');
+        mfaError.code = 'mfa-required';
+        mfaError.resolver = resolver;
+        throw mfaError;
+      }
+      throw error;
+    }
+  }
+
+  // ログイン完了処理（通常ログインとMFA後の両方で使用）
+  async function completeLogin(user, company) {
+    try {
+      // その企業にユーザーが存在するか確認
       const userDocRef = doc(db, 'companies', company.id, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -80,12 +111,12 @@ export function AuthProvider({ children }) {
         throw new Error('管理画面へのアクセス権限がありません');
       }
 
-      // 4. 最終ログイン日時を更新
+      // 最終ログイン日時を更新
       await updateDoc(userDocRef, {
         lastLoginAt: serverTimestamp()
       });
 
-      // 5. 状態を更新
+      // 状態を更新
       setCompanyId(company.id);
       setCompanyInfo(company);
       setUserInfo({
@@ -94,13 +125,120 @@ export function AuthProvider({ children }) {
       });
 
       // 企業コードをローカルストレージに保存
-      localStorage.setItem('lastCompanyCode', companyCode);
+      localStorage.setItem('lastCompanyCode', company.companyCode);
+
+      // MFA状態をクリア
+      setMfaResolver(null);
+      setPendingCompany(null);
 
       return user;
     } catch (error) {
       await signOut(auth);
       throw error;
     }
+  }
+
+  // MFA: SMS認証コード送信
+  async function sendMfaSmsCode(phoneHint, recaptchaVerifier) {
+    if (!mfaResolver) throw new Error('MFAセッションがありません');
+
+    const phoneAuthProvider = new PhoneAuthProvider(auth);
+    const verificationId = await phoneAuthProvider.verifyPhoneNumber({
+      multiFactorHint: phoneHint,
+      session: mfaResolver.session
+    }, recaptchaVerifier);
+
+    return verificationId;
+  }
+
+  // MFA: SMS認証コードで認証完了
+  async function verifyMfaSmsCode(verificationId, verificationCode) {
+    if (!mfaResolver || !pendingCompany) throw new Error('MFAセッションがありません');
+
+    const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+    const assertion = PhoneMultiFactorGenerator.assertion(credential);
+    const userCredential = await mfaResolver.resolveSignIn(assertion);
+
+    return await completeLogin(userCredential.user, pendingCompany);
+  }
+
+  // MFA: TOTP認証コードで認証完了
+  async function verifyMfaTotpCode(factorUid, verificationCode) {
+    if (!mfaResolver || !pendingCompany) throw new Error('MFAセッションがありません');
+
+    const assertion = TotpMultiFactorGenerator.assertionForSignIn(factorUid, verificationCode);
+    const userCredential = await mfaResolver.resolveSignIn(assertion);
+
+    return await completeLogin(userCredential.user, pendingCompany);
+  }
+
+  // MFA: SMS登録用コード送信
+  async function enrollSmsMfa(phoneNumber, recaptchaVerifier) {
+    if (!currentUser) throw new Error('ログインが必要です');
+
+    const session = await multiFactor(currentUser).getSession();
+    const phoneAuthProvider = new PhoneAuthProvider(auth);
+    const verificationId = await phoneAuthProvider.verifyPhoneNumber({
+      phoneNumber,
+      session
+    }, recaptchaVerifier);
+
+    return verificationId;
+  }
+
+  // MFA: SMS登録完了
+  async function completeSmsMfaEnrollment(verificationId, verificationCode, displayName = 'SMS認証') {
+    if (!currentUser) throw new Error('ログインが必要です');
+
+    const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+    const assertion = PhoneMultiFactorGenerator.assertion(credential);
+    await multiFactor(currentUser).enroll(assertion, displayName);
+  }
+
+  // MFA: TOTP登録開始（シークレット生成）
+  async function startTotpEnrollment() {
+    if (!currentUser) throw new Error('ログインが必要です');
+
+    const session = await multiFactor(currentUser).getSession();
+    const totpSecret = await TotpMultiFactorGenerator.generateSecret(session);
+
+    return totpSecret;
+  }
+
+  // MFA: TOTP登録完了
+  async function completeTotpEnrollment(totpSecret, verificationCode, displayName = '認証アプリ') {
+    if (!currentUser) throw new Error('ログインが必要です');
+
+    const assertion = TotpMultiFactorGenerator.assertionForEnrollment(totpSecret, verificationCode);
+    await multiFactor(currentUser).enroll(assertion, displayName);
+  }
+
+  // MFA: 登録済みMFA一覧取得
+  function getEnrolledMfaFactors() {
+    if (!currentUser) return [];
+    return multiFactor(currentUser).enrolledFactors;
+  }
+
+  // MFA: MFA登録解除
+  async function unenrollMfa(factorUid) {
+    if (!currentUser) throw new Error('ログインが必要です');
+
+    const factors = multiFactor(currentUser).enrolledFactors;
+    const factor = factors.find(f => f.uid === factorUid);
+    if (factor) {
+      await multiFactor(currentUser).unenroll(factor);
+    }
+  }
+
+  // MFA: 管理者の2FA必須チェック
+  function requiresMfaSetup() {
+    if (!userInfo || !currentUser) return false;
+    // 管理者で2FA未設定の場合はtrue
+    if (userInfo.role === 'admin') {
+      const factors = multiFactor(currentUser).enrolledFactors;
+      return factors.length === 0;
+    }
+    return false;
   }
 
   // パスワードリセットメールを送信
@@ -206,7 +344,19 @@ export function AuthProvider({ children }) {
     resetPassword,
     isAdmin,
     isManagerOrAbove,
-    loading
+    loading,
+    // MFA関連
+    mfaResolver,
+    sendMfaSmsCode,
+    verifyMfaSmsCode,
+    verifyMfaTotpCode,
+    enrollSmsMfa,
+    completeSmsMfaEnrollment,
+    startTotpEnrollment,
+    completeTotpEnrollment,
+    getEnrolledMfaFactors,
+    unenrollMfa,
+    requiresMfaSetup
   };
 
   return (

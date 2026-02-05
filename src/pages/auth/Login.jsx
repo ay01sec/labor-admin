@@ -1,8 +1,10 @@
 // src/pages/auth/Login.jsx
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Eye, EyeOff, LogIn, AlertCircle, Building } from 'lucide-react';
+import { RecaptchaVerifier } from 'firebase/auth';
+import { auth } from '../../services/firebase';
+import { Eye, EyeOff, LogIn, AlertCircle, Building, Smartphone, Key, ArrowLeft } from 'lucide-react';
 
 export default function Login() {
   const [companyCode, setCompanyCode] = useState(() => {
@@ -14,8 +16,31 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  // MFA関連の状態
+  const [mfaStep, setMfaStep] = useState(null); // null | 'select' | 'sms' | 'totp'
+  const [mfaHints, setMfaHints] = useState([]);
+  const [selectedMfaHint, setSelectedMfaHint] = useState(null);
+  const [verificationId, setVerificationId] = useState(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+
+  const recaptchaContainerRef = useRef(null);
+  const recaptchaVerifierRef = useRef(null);
+
+  const { login, sendMfaSmsCode, verifyMfaSmsCode, verifyMfaTotpCode, mfaResolver } = useAuth();
   const navigate = useNavigate();
+
+  // reCAPTCHA初期化
+  useEffect(() => {
+    if (mfaStep === 'sms' && recaptchaContainerRef.current && !recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
+        size: 'invisible',
+        callback: () => {
+          // reCAPTCHA solved
+        }
+      });
+    }
+  }, [mfaStep]);
 
   const handleCompanyCodeChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 8);
@@ -38,6 +63,19 @@ export default function Login() {
       navigate('/');
     } catch (err) {
       console.error('ログインエラー:', err);
+
+      // MFA認証が必要な場合
+      if (err.code === 'mfa-required') {
+        const hints = err.resolver.hints;
+        setMfaHints(hints);
+        if (hints.length === 1) {
+          // 1つのMFAのみ登録されている場合は自動選択
+          handleSelectMfa(hints[0]);
+        } else {
+          setMfaStep('select');
+        }
+        return;
+      }
 
       switch (err.code) {
         case 'auth/invalid-email':
@@ -63,6 +101,210 @@ export default function Login() {
     }
   };
 
+  const handleSelectMfa = async (hint) => {
+    setSelectedMfaHint(hint);
+    setError('');
+
+    if (hint.factorId === 'phone') {
+      setMfaStep('sms');
+      // SMS送信
+      await handleSendSmsCode(hint);
+    } else if (hint.factorId === 'totp') {
+      setMfaStep('totp');
+    }
+  };
+
+  const handleSendSmsCode = async (hint) => {
+    setSendingCode(true);
+    setError('');
+
+    try {
+      // reCAPTCHA初期化を待つ
+      if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible'
+        });
+      }
+
+      const verId = await sendMfaSmsCode(hint, recaptchaVerifierRef.current);
+      setVerificationId(verId);
+    } catch (err) {
+      console.error('SMS送信エラー:', err);
+      setError('SMSの送信に失敗しました。しばらくしてから再度お試しください。');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (mfaStep === 'sms') {
+        await verifyMfaSmsCode(verificationId, verificationCode);
+      } else if (mfaStep === 'totp') {
+        await verifyMfaTotpCode(selectedMfaHint.uid, verificationCode);
+      }
+      navigate('/');
+    } catch (err) {
+      console.error('認証エラー:', err);
+      setError('認証コードが正しくありません');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setMfaStep(null);
+    setMfaHints([]);
+    setSelectedMfaHint(null);
+    setVerificationId(null);
+    setVerificationCode('');
+    setError('');
+  };
+
+  // MFA選択画面
+  if (mfaStep === 'select') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-500 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl shadow-lg">
+              <Key className="text-white" size={32} />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">2段階認証</h1>
+            <p className="text-gray-500 mt-2">認証方法を選択してください</p>
+          </div>
+
+          <div className="space-y-3">
+            {mfaHints.map((hint, index) => (
+              <button
+                key={index}
+                onClick={() => handleSelectMfa(hint)}
+                className="w-full flex items-center space-x-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {hint.factorId === 'phone' ? (
+                  <Smartphone className="text-blue-600" size={24} />
+                ) : (
+                  <Key className="text-green-600" size={24} />
+                )}
+                <div className="text-left">
+                  <p className="font-medium text-gray-800">
+                    {hint.factorId === 'phone' ? 'SMS認証' : '認証アプリ'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {hint.displayName || (hint.factorId === 'phone' ? hint.phoneNumber : 'TOTP')}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handleBackToLogin}
+            className="mt-6 w-full flex items-center justify-center space-x-2 text-gray-600 hover:text-gray-800"
+          >
+            <ArrowLeft size={18} />
+            <span>ログインに戻る</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // MFA認証コード入力画面
+  if (mfaStep === 'sms' || mfaStep === 'totp') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-500 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl shadow-lg">
+              {mfaStep === 'sms' ? (
+                <Smartphone className="text-white" size={32} />
+              ) : (
+                <Key className="text-white" size={32} />
+              )}
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">2段階認証</h1>
+            <p className="text-gray-500 mt-2">
+              {mfaStep === 'sms'
+                ? 'SMSで送信された6桁のコードを入力してください'
+                : '認証アプリに表示されている6桁のコードを入力してください'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start space-x-3">
+              <AlertCircle className="flex-shrink-0 mt-0.5" size={18} />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyCode} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                認証コード
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                required
+                autoFocus
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors tracking-widest font-mono text-2xl text-center"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || verificationCode.length !== 6}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <LogIn size={20} />
+                  <span>認証</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {mfaStep === 'sms' && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => handleSendSmsCode(selectedMfaHint)}
+                disabled={sendingCode}
+                className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+              >
+                {sendingCode ? '送信中...' : 'コードを再送信'}
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleBackToLogin}
+            className="mt-6 w-full flex items-center justify-center space-x-2 text-gray-600 hover:text-gray-800"
+          >
+            <ArrowLeft size={18} />
+            <span>ログインに戻る</span>
+          </button>
+
+          {/* reCAPTCHA container */}
+          <div id="recaptcha-container" ref={recaptchaContainerRef}></div>
+        </div>
+      </div>
+    );
+  }
+
+  // 通常のログイン画面
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
