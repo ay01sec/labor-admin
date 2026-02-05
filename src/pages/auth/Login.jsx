@@ -97,7 +97,14 @@ export default function Login() {
 
       // カスタム2FA認証が必要な場合
       if (err.code === 'custom-2fa-required') {
-        await handleSendCustom2FACode(err.pending2FAData?.company?.id);
+        console.log('2FA required, pending data:', err.pending2FAData);
+        const companyId = err.pending2FAData?.company?.id;
+        console.log('Company ID for 2FA:', companyId);
+        if (companyId) {
+          await handleSendCustom2FACode(companyId);
+        } else {
+          setError('2FA認証の初期化に失敗しました。再度ログインしてください。');
+        }
         return;
       }
 
@@ -191,10 +198,13 @@ export default function Login() {
 
   // カスタム2FA: コード送信
   const handleSendCustom2FACode = async (companyIdOverride = null) => {
+    console.log('handleSendCustom2FACode called with:', companyIdOverride);
     setSending2FACode(true);
     setError('');
     try {
+      console.log('Calling send2FACode...');
       const result = await send2FACode(companyIdOverride);
+      console.log('send2FACode result:', result);
       setCustom2FAStep('code');
       // 開発用: SMTPが未設定の場合はコードを表示
       if (result.devCode) {
@@ -202,7 +212,8 @@ export default function Login() {
       }
     } catch (err) {
       console.error('2FAコード送信エラー:', err);
-      setError('認証コードの送信に失敗しました');
+      console.error('Error details:', err.code, err.message);
+      setError('認証コードの送信に失敗しました: ' + (err.message || '不明なエラー'));
     } finally {
       setSending2FACode(false);
     }
