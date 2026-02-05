@@ -8,7 +8,9 @@ import {
   getDocs,
   orderBy,
   deleteDoc,
-  doc
+  updateDoc,
+  doc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import {
@@ -21,7 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  X
 } from 'lucide-react';
 import CsvImportModal from '../../components/CsvImport/CsvImportModal';
 import { useEmploymentTypes } from '../../hooks/useEmploymentTypes';
@@ -63,6 +67,9 @@ export default function EmployeeList() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState({ employmentType: '', isActive: '' });
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const itemsPerPage = 10;
 
   // データ取得関数
@@ -139,6 +146,43 @@ export default function EmployeeList() {
     } catch (error) {
       console.error('削除エラー:', error);
       alert('削除に失敗しました');
+    }
+  };
+
+  // 一括変更処理
+  const handleBulkUpdate = async () => {
+    const changes = {};
+    if (bulkEditData.employmentType) {
+      changes['employment.type'] = bulkEditData.employmentType;
+    }
+    if (bulkEditData.isActive !== '') {
+      changes.isActive = bulkEditData.isActive === 'true';
+    }
+
+    if (Object.keys(changes).length === 0) {
+      alert('変更する項目を選択してください');
+      return;
+    }
+
+    if (!confirm(`${selectedIds.length}件の社員情報を一括変更しますか？`)) return;
+
+    setBulkUpdating(true);
+    try {
+      const updatePromises = selectedIds.map(id => {
+        const docRef = doc(db, 'companies', companyId, 'employees', id);
+        return updateDoc(docRef, { ...changes, updatedAt: serverTimestamp() });
+      });
+      await Promise.all(updatePromises);
+
+      setShowBulkEditModal(false);
+      setBulkEditData({ employmentType: '', isActive: '' });
+      setSelectedIds([]);
+      await fetchEmployees();
+    } catch (error) {
+      console.error('一括更新エラー:', error);
+      alert('一括更新に失敗しました');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -400,17 +444,29 @@ export default function EmployeeList() {
       {filteredEmployees.length > 0 && (
         <div className="flex items-center space-x-4">
           {isAdmin() && selectedIds.length > 0 && (
-            <button
-              onClick={() => {
-                if (confirm(`${selectedIds.length}件の社員を削除しますか？`)) {
-                  // 一括削除処理
-                }
-              }}
-              className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1"
-            >
-              <Trash2 size={16} />
-              <span>一括削除 ({selectedIds.length}件)</span>
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setBulkEditData({ employmentType: '', isActive: '' });
+                  setShowBulkEditModal(true);
+                }}
+                className="text-blue-600 hover:text-blue-800 text-sm flex items-center space-x-1"
+              >
+                <RefreshCw size={16} />
+                <span>一括変更 ({selectedIds.length}件)</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`${selectedIds.length}件の社員を削除しますか？`)) {
+                    // 一括削除処理
+                  }
+                }}
+                className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1"
+              >
+                <Trash2 size={16} />
+                <span>一括削除 ({selectedIds.length}件)</span>
+              </button>
+            </>
           )}
           <button
             onClick={handleExport}
@@ -419,6 +475,74 @@ export default function EmployeeList() {
             <Download size={16} />
             <span>CSVエクスポート</span>
           </button>
+        </div>
+      )}
+
+      {/* 一括変更モーダル */}
+      {showBulkEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800">
+                一括変更（{selectedIds.length}件選択中）
+              </h3>
+              <button
+                onClick={() => setShowBulkEditModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">雇用形態</label>
+                <select
+                  value={bulkEditData.employmentType}
+                  onChange={(e) => setBulkEditData(prev => ({ ...prev, employmentType: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">変更しない</option>
+                  {employmentTypes.map((type) => (
+                    <option key={type.id} value={type.label}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">在籍状況</label>
+                <select
+                  value={bulkEditData.isActive}
+                  onChange={(e) => setBulkEditData(prev => ({ ...prev, isActive: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">変更しない</option>
+                  <option value="true">在籍</option>
+                  <option value="false">退職</option>
+                </select>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                ※「変更しない」のままの項目は現在の値が維持されます
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 p-5 border-t border-gray-200">
+              <button
+                onClick={() => setShowBulkEditModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleBulkUpdate}
+                disabled={bulkUpdating || (!bulkEditData.employmentType && bulkEditData.isActive === '')}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkUpdating ? '更新中...' : '変更を適用'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
