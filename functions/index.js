@@ -296,6 +296,156 @@ exports.cancelCompany = onCall(
 /**
  * 新規企業登録 Cloud Function
  */
+/**
+ * 2段階認証コード送信
+ */
+exports.send2FACode = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    try {
+      // ユーザー情報を取得
+      const userDoc = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!userDoc.exists) {
+        throw new HttpsError("not-found", "ユーザーが見つかりません");
+      }
+
+      const userData = userDoc.data();
+
+      // 6桁のコードを生成
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分後に期限切れ
+
+      // コードをFirestoreに保存
+      await db.collection("twoFactorCodes").doc(request.auth.uid).set({
+        code,
+        companyId,
+        expiresAt: Timestamp.fromDate(expiresAt),
+        createdAt: FieldValue.serverTimestamp(),
+        verified: false,
+      });
+
+      // メール送信
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpPort = process.env.SMTP_PORT;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (!smtpHost || !smtpUser || !smtpPass) {
+        console.warn("SMTP設定が未設定のためメール送信をスキップ");
+        // 開発用: SMTPが未設定の場合はコードをレスポンスに含める
+        return { success: true, devCode: code };
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: Number(smtpPort) || 587,
+        secure: false,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      const mailBody = `
+${userData.displayName} 様
+
+以下の認証コードを入力してログインを完了してください。
+
+━━━━━━━━━━━━━━━━━━━━━━
+認証コード: ${code}
+━━━━━━━━━━━━━━━━━━━━━━
+
+※ このコードは10分間有効です。
+※ このメールに心当たりがない場合は、破棄してください。
+`.trim();
+
+      await transporter.sendMail({
+        from: `"労務管理システム" <${smtpUser}>`,
+        to: userData.email,
+        subject: "【労務管理システム】認証コード",
+        text: mailBody,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("2FAコード送信エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "認証コードの送信に失敗しました");
+    }
+  }
+);
+
+/**
+ * 2段階認証コード検証
+ */
+exports.verify2FACode = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { code } = request.data;
+    if (!code) {
+      throw new HttpsError("invalid-argument", "認証コードは必須です");
+    }
+
+    try {
+      const codeDoc = await db
+        .collection("twoFactorCodes")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!codeDoc.exists) {
+        throw new HttpsError("not-found", "認証コードが見つかりません。再度コードを送信してください。");
+      }
+
+      const codeData = codeDoc.data();
+
+      // 有効期限チェック
+      if (codeData.expiresAt.toDate() < new Date()) {
+        await db.collection("twoFactorCodes").doc(request.auth.uid).delete();
+        throw new HttpsError("deadline-exceeded", "認証コードの有効期限が切れました。再度コードを送信してください。");
+      }
+
+      // コードチェック
+      if (codeData.code !== code) {
+        throw new HttpsError("invalid-argument", "認証コードが正しくありません");
+      }
+
+      // 検証済みに更新
+      await db.collection("twoFactorCodes").doc(request.auth.uid).update({
+        verified: true,
+        verifiedAt: FieldValue.serverTimestamp(),
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("2FAコード検証エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "認証コードの検証に失敗しました");
+    }
+  }
+);
+
+/**
+ * 新規企業登録 Cloud Function
+ */
 exports.registerCompany = onCall(
   { region: "asia-northeast1", maxInstances: 10 },
   async (request) => {

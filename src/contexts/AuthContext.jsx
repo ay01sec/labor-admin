@@ -23,7 +23,8 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import { auth, db, functions } from '../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 const AuthContext = createContext();
 
@@ -41,6 +42,12 @@ export function AuthProvider({ children }) {
   const [mfaResolver, setMfaResolver] = useState(null);
   const [pendingCompany, setPendingCompany] = useState(null);
   const [recaptchaVerifier, setRecaptchaVerifier] = useState(null);
+
+  // カスタム2FA関連の状態
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [pending2FAUser, setPending2FAUser] = useState(null);
+  const [pending2FACompany, setPending2FACompany] = useState(null);
+  const [twoFAVerified, setTwoFAVerified] = useState(false);
 
   // 企業コードで企業を検索（未認証でも可能）
   async function findCompanyByCode(companyCode) {
@@ -117,7 +124,22 @@ export function AuthProvider({ children }) {
         lastLoginAt: serverTimestamp()
       });
 
-      // 状態を更新
+      // 管理者の場合は2FA認証を要求
+      if (needs2FA(userData)) {
+        setPending2FAUser({
+          id: user.uid,
+          ...userData
+        });
+        setPending2FACompany(company);
+        setRequires2FA(true);
+
+        // 2FA必要エラーを投げる
+        const twoFAError = new Error('2段階認証が必要です');
+        twoFAError.code = 'custom-2fa-required';
+        throw twoFAError;
+      }
+
+      // 2FA不要の場合は通常通りログイン完了
       setCompanyId(company.id);
       setCompanyInfo(company);
       setUserInfo({
@@ -134,6 +156,10 @@ export function AuthProvider({ children }) {
 
       return user;
     } catch (error) {
+      // 2FAエラーの場合はログアウトしない
+      if (error.code === 'custom-2fa-required') {
+        throw error;
+      }
       await signOut(auth);
       throw error;
     }
@@ -257,6 +283,56 @@ export function AuthProvider({ children }) {
     return currentUser?.emailVerified ?? false;
   }
 
+  // カスタム2FA: コード送信
+  async function send2FACode() {
+    if (!pending2FAUser || !pending2FACompany) {
+      throw new Error('2FA認証セッションがありません');
+    }
+    const send2FACodeFn = httpsCallable(functions, 'send2FACode');
+    const result = await send2FACodeFn({ companyId: pending2FACompany.id });
+    return result.data;
+  }
+
+  // カスタム2FA: コード検証
+  async function verify2FACode(code) {
+    if (!pending2FAUser || !pending2FACompany) {
+      throw new Error('2FA認証セッションがありません');
+    }
+    const verify2FACodeFn = httpsCallable(functions, 'verify2FACode');
+    await verify2FACodeFn({ code });
+
+    // 検証成功 - ログイン完了処理
+    setTwoFAVerified(true);
+    setRequires2FA(false);
+
+    // ユーザー情報を設定
+    setCompanyId(pending2FACompany.id);
+    setCompanyInfo(pending2FACompany);
+    setUserInfo(pending2FAUser);
+
+    // 企業コードをローカルストレージに保存
+    localStorage.setItem('lastCompanyCode', pending2FACompany.companyCode);
+
+    // pending状態をクリア
+    setPending2FAUser(null);
+    setPending2FACompany(null);
+
+    return true;
+  }
+
+  // カスタム2FA: キャンセル（ログアウト）
+  async function cancel2FA() {
+    setPending2FAUser(null);
+    setPending2FACompany(null);
+    setRequires2FA(false);
+    await signOut(auth);
+  }
+
+  // 2FA が必要かチェック（管理者のみ）
+  function needs2FA(userData) {
+    return userData?.role === 'admin';
+  }
+
   // パスワードリセットメールを送信
   async function resetPassword(email) {
     await sendPasswordResetEmail(auth, email);
@@ -374,7 +450,13 @@ export function AuthProvider({ children }) {
     unenrollMfa,
     requiresMfaSetup,
     sendVerificationEmail,
-    isEmailVerified
+    isEmailVerified,
+    // カスタム2FA関連
+    requires2FA,
+    pending2FAUser,
+    send2FACode,
+    verify2FACode,
+    cancel2FA
   };
 
   return (

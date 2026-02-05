@@ -27,8 +27,26 @@ export default function Login() {
   const recaptchaContainerRef = useRef(null);
   const recaptchaVerifierRef = useRef(null);
 
-  const { login, sendMfaSmsCode, verifyMfaSmsCode, verifyMfaTotpCode, mfaResolver } = useAuth();
+  const {
+    login,
+    sendMfaSmsCode,
+    verifyMfaSmsCode,
+    verifyMfaTotpCode,
+    mfaResolver,
+    // カスタム2FA
+    requires2FA,
+    pending2FAUser,
+    send2FACode,
+    verify2FACode,
+    cancel2FA
+  } = useAuth();
   const navigate = useNavigate();
+
+  // カスタム2FA関連の状態
+  const [custom2FAStep, setCustom2FAStep] = useState(null); // null | 'code'
+  const [custom2FACode, setCustom2FACode] = useState('');
+  const [sending2FACode, setSending2FACode] = useState(false);
+  const [devCode, setDevCode] = useState(null); // 開発用
 
   // reCAPTCHA初期化
   useEffect(() => {
@@ -74,6 +92,12 @@ export default function Login() {
         } else {
           setMfaStep('select');
         }
+        return;
+      }
+
+      // カスタム2FA認証が必要な場合
+      if (err.code === 'custom-2fa-required') {
+        await handleSendCustom2FACode();
         return;
       }
 
@@ -164,6 +188,145 @@ export default function Login() {
     setVerificationCode('');
     setError('');
   };
+
+  // カスタム2FA: コード送信
+  const handleSendCustom2FACode = async () => {
+    setSending2FACode(true);
+    setError('');
+    try {
+      const result = await send2FACode();
+      setCustom2FAStep('code');
+      // 開発用: SMTPが未設定の場合はコードを表示
+      if (result.devCode) {
+        setDevCode(result.devCode);
+      }
+    } catch (err) {
+      console.error('2FAコード送信エラー:', err);
+      setError('認証コードの送信に失敗しました');
+    } finally {
+      setSending2FACode(false);
+    }
+  };
+
+  // カスタム2FA: コード検証
+  const handleVerifyCustom2FACode = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await verify2FACode(custom2FACode);
+      navigate('/');
+    } catch (err) {
+      console.error('2FA検証エラー:', err);
+      if (err.code === 'functions/deadline-exceeded') {
+        setError('認証コードの有効期限が切れました。再度コードを送信してください。');
+      } else if (err.code === 'functions/invalid-argument') {
+        setError('認証コードが正しくありません');
+      } else {
+        setError(err.message || '認証に失敗しました');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // カスタム2FA: キャンセル
+  const handleCancelCustom2FA = async () => {
+    await cancel2FA();
+    setCustom2FAStep(null);
+    setCustom2FACode('');
+    setDevCode(null);
+    setError('');
+  };
+
+  // カスタム2FA認証コード入力画面
+  if (custom2FAStep === 'code') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-500 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl shadow-lg">
+              ✉️
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">2段階認証</h1>
+            <p className="text-gray-500 mt-2">
+              {pending2FAUser?.email} に送信された<br />
+              6桁の認証コードを入力してください
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start space-x-3">
+              <AlertCircle className="flex-shrink-0 mt-0.5" size={18} />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          {/* 開発用: SMTP未設定時のコード表示 */}
+          {devCode && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6">
+              <p className="text-xs font-medium">開発用（SMTP未設定）</p>
+              <p className="text-2xl font-mono font-bold tracking-widest">{devCode}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyCustom2FACode} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                認証コード
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={custom2FACode}
+                onChange={(e) => setCustom2FACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                required
+                autoFocus
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors tracking-widest font-mono text-2xl text-center"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || custom2FACode.length !== 6}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <LogIn size={20} />
+                  <span>認証</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={handleSendCustom2FACode}
+              disabled={sending2FACode}
+              className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+            >
+              {sending2FACode ? '送信中...' : 'コードを再送信'}
+            </button>
+          </div>
+
+          <button
+            onClick={handleCancelCustom2FA}
+            className="mt-6 w-full flex items-center justify-center space-x-2 text-gray-600 hover:text-gray-800"
+          >
+            <ArrowLeft size={18} />
+            <span>ログインに戻る</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // MFA選択画面
   if (mfaStep === 'select') {
