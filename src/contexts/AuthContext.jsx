@@ -232,14 +232,18 @@ export function AuthProvider({ children }) {
   }
 
   // MFA: 管理者の2FA必須チェック
+  // TODO: 本番環境では true を返すように修正する
   function requiresMfaSetup() {
-    if (!userInfo || !currentUser) return false;
-    // 管理者で2FA未設定の場合はtrue
-    if (userInfo.role === 'admin') {
-      const factors = multiFactor(currentUser).enrolledFactors;
-      return factors.length === 0;
-    }
+    // 一時的に無効化（TOTP設定完了後に有効化する）
     return false;
+
+    // if (!userInfo || !currentUser) return false;
+    // // 管理者で2FA未設定の場合はtrue
+    // if (userInfo.role === 'admin') {
+    //   const factors = multiFactor(currentUser).enrolledFactors;
+    //   return factors.length === 0;
+    // }
+    // return false;
   }
 
   // メール確認メールを送信
