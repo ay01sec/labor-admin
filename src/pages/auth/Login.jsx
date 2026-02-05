@@ -169,9 +169,19 @@ export default function Login() {
           </Link>
         </div>
 
+        {/* 新規利用 */}
+        <div className="mt-4 text-center">
+          <Link
+            to="/register"
+            className="text-sm text-gray-500 hover:text-blue-600"
+          >
+            新規利用はこちら
+          </Link>
+        </div>
+
         {/* フッター */}
         <p className="text-center text-gray-400 text-sm mt-8">
-          © 2025 Labor Management System
+          © 2026 Labor Management System
         </p>
       </div>
     </div>

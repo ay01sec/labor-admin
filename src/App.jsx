@@ -9,6 +9,7 @@ import Layout from './components/Layout/Layout';
 // Auth Pages
 import Login from './pages/auth/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import Register from './pages/auth/Register';
 
 // Main Pages
 import Dashboard from './pages/Dashboard';
@@ -95,6 +96,12 @@ function AppRoutes() {
       <Route
         path="/forgot-password"
         element={currentUser ? <Navigate to="/" /> : <ForgotPassword />}
+      />
+
+      {/* 新規利用開始手続き */}
+      <Route
+        path="/register"
+        element={currentUser ? <Navigate to="/" /> : <Register />}
       />
 
       {/* 認証が必要なルート */}
