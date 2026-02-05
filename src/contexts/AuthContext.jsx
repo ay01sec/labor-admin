@@ -5,6 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  sendEmailVerification,
   multiFactor,
   getMultiFactorResolver,
   PhoneAuthProvider,
@@ -241,6 +242,17 @@ export function AuthProvider({ children }) {
     return false;
   }
 
+  // メール確認メールを送信
+  async function sendVerificationEmail() {
+    if (!currentUser) throw new Error('ログインが必要です');
+    await sendEmailVerification(currentUser);
+  }
+
+  // メールが確認済みかチェック
+  function isEmailVerified() {
+    return currentUser?.emailVerified ?? false;
+  }
+
   // パスワードリセットメールを送信
   async function resetPassword(email) {
     await sendPasswordResetEmail(auth, email);
@@ -356,7 +368,9 @@ export function AuthProvider({ children }) {
     completeTotpEnrollment,
     getEnrolledMfaFactors,
     unenrollMfa,
-    requiresMfaSetup
+    requiresMfaSetup,
+    sendVerificationEmail,
+    isEmailVerified
   };
 
   return (

@@ -30,7 +30,9 @@ export default function MfaSettings() {
     startTotpEnrollment,
     completeTotpEnrollment,
     unenrollMfa,
-    requiresMfaSetup
+    requiresMfaSetup,
+    sendVerificationEmail,
+    isEmailVerified
   } = useAuth();
 
   const [enrolledFactors, setEnrolledFactors] = useState([]);
@@ -50,6 +52,9 @@ export default function MfaSettings() {
   const [totpSecret, setTotpSecret] = useState(null);
   const [totpQrCode, setTotpQrCode] = useState('');
   const [totpCode, setTotpCode] = useState('');
+
+  // メール確認
+  const [sendingVerification, setSendingVerification] = useState(false);
 
   const recaptchaContainerRef = useRef(null);
   const recaptchaVerifierRef = useRef(null);
@@ -220,6 +225,24 @@ export default function MfaSettings() {
     setSuccess('シークレットキーをコピーしました');
   };
 
+  const handleSendVerificationEmail = async () => {
+    setSendingVerification(true);
+    setError('');
+    try {
+      await sendVerificationEmail();
+      setSuccess('確認メールを送信しました。メール内のリンクをクリックして認証を完了してください。');
+    } catch (err) {
+      console.error('メール送信エラー:', err);
+      if (err.code === 'auth/too-many-requests') {
+        setError('リクエストが多すぎます。しばらく待ってから再試行してください。');
+      } else {
+        setError('確認メールの送信に失敗しました。');
+      }
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
   const isRequired = isAdmin() && enrolledFactors.length === 0;
 
   return (
@@ -248,6 +271,36 @@ export default function MfaSettings() {
               管理者アカウントはセキュリティのため、2段階認証の設定が必須です。
               SMS認証または認証アプリを設定してください。
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* メール未確認警告 */}
+      {!isEmailVerified() && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+            <div className="flex-1">
+              <p className="font-medium text-red-800">メールアドレスの確認が必要です</p>
+              <p className="text-sm text-red-700 mb-3">
+                2段階認証を設定するには、先にメールアドレスを確認する必要があります。
+                下のボタンをクリックして確認メールを送信し、メール内のリンクをクリックしてください。
+              </p>
+              <button
+                onClick={handleSendVerificationEmail}
+                disabled={sendingVerification}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {sendingVerification ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>送信中...</span>
+                  </>
+                ) : (
+                  <span>確認メールを送信</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
