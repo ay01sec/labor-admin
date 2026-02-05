@@ -1,5 +1,14 @@
 # 労務管理システム 操作マニュアル
 
+---
+
+**関連ドキュメント:**
+- [特定商取引法に基づく表記](./docs/legal/TOKUSHOHO.md)
+- [プライバシーポリシー](./docs/legal/PRIVACY_POLICY.md)
+- [利用規約](./docs/legal/TERMS_OF_SERVICE.md)
+
+---
+
 ## 新規利用開始（企業登録）
 
 新しく企業を登録してシステムの利用を開始します。
