@@ -3,19 +3,18 @@ const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const nodemailer = require("nodemailer");
-const Stripe = require("stripe");
 
 initializeApp();
 const db = getFirestore();
 const auth = getAuth();
 
-// Stripe初期化（環境変数から）
-function getStripe() {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+// PAY.JP初期化（環境変数から）
+function getPayjp() {
+  const secretKey = process.env.PAYJP_SECRET_KEY;
   if (!secretKey) {
-    throw new HttpsError("failed-precondition", "Stripe設定が未完了です。管理者に連絡してください。");
+    throw new HttpsError("failed-precondition", "PAY.JP設定が未完了です。管理者に連絡してください。");
   }
-  return new Stripe(secretKey);
+  return require("payjp")(secretKey);
 }
 
 /**
@@ -116,22 +115,22 @@ ${displayName} 様
 }
 
 /**
- * Stripe SetupIntent作成（カード登録用）
+ * PAY.JP カード登録処理
  */
-exports.createSetupIntent = onCall(
+exports.registerCard = onCall(
   { region: "asia-northeast1", maxInstances: 10 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "認証が必要です");
     }
 
-    const { companyId } = request.data;
-    if (!companyId) {
-      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    const { companyId, tokenId } = request.data;
+    if (!companyId || !tokenId) {
+      throw new HttpsError("invalid-argument", "companyIdとtokenIdは必須です");
     }
 
     try {
-      const stripe = getStripe();
+      const payjp = getPayjp();
       const companyRef = db.collection("companies").doc(companyId);
       const companySnap = await companyRef.get();
 
@@ -140,84 +139,35 @@ exports.createSetupIntent = onCall(
       }
 
       const companyData = companySnap.data();
-      let stripeCustomerId = companyData.billing?.stripeCustomerId;
+      let payjpCustomerId = companyData.billing?.payjpCustomerId;
+      let card;
 
-      // Stripe Customerが未作成なら作成
-      if (!stripeCustomerId) {
-        const customer = await stripe.customers.create({
-          name: companyData.companyName,
-          email: companyData.email || undefined,
-          metadata: {
-            companyId,
-            companyCode: companyData.companyCode,
-          },
+      if (!payjpCustomerId) {
+        // PAY.JP顧客が未作成 → 顧客作成（カード付き）
+        const customer = await payjp.customers.create({
+          card: tokenId,
+          description: `${companyData.companyName} (${companyData.companyCode})`,
         });
-        stripeCustomerId = customer.id;
+        payjpCustomerId = customer.id;
+        card = customer.cards.data[0];
+      } else {
+        // 既存顧客 → カード追加
+        const newCard = await payjp.customers.cards.create(payjpCustomerId, {
+          card: tokenId,
+        });
+        card = newCard;
 
-        // Firestoreに保存
-        await companyRef.update({
-          "billing.stripeCustomerId": stripeCustomerId,
-          updatedAt: FieldValue.serverTimestamp(),
+        // デフォルトカードに設定
+        await payjp.customers.update(payjpCustomerId, {
+          default_card: card.id,
         });
       }
-
-      // SetupIntent作成
-      const setupIntent = await stripe.setupIntents.create({
-        customer: stripeCustomerId,
-        payment_method_types: ["card"],
-      });
-
-      return {
-        clientSecret: setupIntent.client_secret,
-      };
-    } catch (error) {
-      console.error("SetupIntent作成エラー:", error);
-      if (error instanceof HttpsError) throw error;
-      throw new HttpsError("internal", "決済設定の初期化に失敗しました");
-    }
-  }
-);
-
-/**
- * カード登録完了処理
- */
-exports.confirmPaymentMethod = onCall(
-  { region: "asia-northeast1", maxInstances: 10 },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "認証が必要です");
-    }
-
-    const { companyId, setupIntentId } = request.data;
-    if (!companyId || !setupIntentId) {
-      throw new HttpsError("invalid-argument", "companyIdとsetupIntentIdは必須です");
-    }
-
-    try {
-      const stripe = getStripe();
-
-      // SetupIntentの確認
-      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
-      if (setupIntent.status !== "succeeded") {
-        throw new HttpsError("failed-precondition", "カード登録が完了していません");
-      }
-
-      // デフォルト支払い方法として設定
-      await stripe.customers.update(setupIntent.customer, {
-        invoice_settings: {
-          default_payment_method: setupIntent.payment_method,
-        },
-      });
-
-      // カード情報の一部を取得（表示用）
-      const paymentMethod = await stripe.paymentMethods.retrieve(setupIntent.payment_method);
-      const card = paymentMethod.card;
 
       // Firestoreを更新
-      const companyRef = db.collection("companies").doc(companyId);
       await companyRef.update({
         "billing.paymentMethod": "card",
         "billing.status": "active",
+        "billing.payjpCustomerId": payjpCustomerId,
         "billing.cardLast4": card.last4,
         "billing.cardBrand": card.brand,
         updatedAt: FieldValue.serverTimestamp(),
@@ -231,9 +181,9 @@ exports.confirmPaymentMethod = onCall(
         },
       };
     } catch (error) {
-      console.error("カード登録確認エラー:", error);
+      console.error("カード登録エラー:", error);
       if (error instanceof HttpsError) throw error;
-      throw new HttpsError("internal", "カード登録の確認に失敗しました");
+      throw new HttpsError("internal", "カード登録に失敗しました");
     }
   }
 );
@@ -405,7 +355,7 @@ exports.registerCompany = onCall(
         billing: {
           status: "trial",
           paymentMethod: null,
-          stripeCustomerId: null,
+          payjpCustomerId: null,
           trialEndsAt: Timestamp.fromDate(
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
           ),

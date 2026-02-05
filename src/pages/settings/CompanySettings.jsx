@@ -1,5 +1,5 @@
 // src/pages/settings/CompanySettings.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   doc,
@@ -9,8 +9,6 @@ import {
 } from 'firebase/firestore';
 import { db, functions } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import {
   Save,
   Settings,
@@ -32,57 +30,89 @@ import {
 } from 'lucide-react';
 import { DEFAULT_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_COLORS } from '../../constants/employmentTypes';
 
-// Stripe公開キー
-const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-  : null;
+// PAY.JP公開キー
+const PAYJP_PUBLIC_KEY = import.meta.env.VITE_PAYJP_PUBLIC_KEY;
 
 // カードブランドの表示名
 const CARD_BRAND_LABELS = {
-  visa: 'Visa',
-  mastercard: 'Mastercard',
-  amex: 'American Express',
-  discover: 'Discover',
-  diners: 'Diners Club',
-  jcb: 'JCB',
-  unionpay: 'UnionPay',
+  'Visa': 'Visa',
+  'MasterCard': 'Mastercard',
+  'American Express': 'American Express',
+  'Discover': 'Discover',
+  'Diners Club': 'Diners Club',
+  'JCB': 'JCB',
 };
 
-// Stripe CardElementの内部コンポーネント
-function CardRegistrationForm({ companyId, onSuccess, onError }) {
-  const stripe = useStripe();
-  const elements = useElements();
+// PAY.JP カード入力コンポーネント
+function PayjpCardForm({ companyId, onSuccess, onError }) {
+  const cardNumberRef = useRef(null);
+  const cardExpiryRef = useRef(null);
+  const cardCvcRef = useRef(null);
+  const payjpRef = useRef(null);
+  const cardNumberElementRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState('');
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!PAYJP_PUBLIC_KEY || !window.Payjp) return;
+
+    const payjp = window.Payjp(PAYJP_PUBLIC_KEY);
+    payjpRef.current = payjp;
+    const elements = payjp.elements();
+
+    const style = {
+      base: {
+        color: '#32325d',
+        fontSize: '16px',
+        '::placeholder': { color: '#aab7c4' },
+      },
+      invalid: { color: '#e25950' },
+    };
+
+    const cardNumber = elements.create('cardNumber', { style });
+    const cardExpiry = elements.create('cardExpiry', { style });
+    const cardCvc = elements.create('cardCvc', { style });
+
+    cardNumber.mount(cardNumberRef.current);
+    cardExpiry.mount(cardExpiryRef.current);
+    cardCvc.mount(cardCvcRef.current);
+
+    cardNumberElementRef.current = cardNumber;
+    setReady(true);
+
+    cardNumber.on('change', (event) => {
+      if (event.error) setCardError(event.error.message);
+      else setCardError('');
+    });
+
+    return () => {
+      cardNumber.unmount();
+      cardExpiry.unmount();
+      cardCvc.unmount();
+    };
+  }, []);
 
   const handleCardSubmit = async () => {
-    if (!stripe || !elements) return;
+    if (!payjpRef.current || !cardNumberElementRef.current) return;
 
     setProcessing(true);
     setCardError('');
 
     try {
-      // 1. SetupIntent取得
-      const createSetupIntent = httpsCallable(functions, 'createSetupIntent');
-      const { data } = await createSetupIntent({ companyId });
+      // 1. PAY.JPトークン作成
+      const response = await payjpRef.current.createToken(cardNumberElementRef.current);
 
-      // 2. カード確認
-      const { error, setupIntent } = await stripe.confirmCardSetup(data.clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement),
-        },
-      });
-
-      if (error) {
-        setCardError(error.message);
+      if (response.error) {
+        setCardError(response.error.message);
         return;
       }
 
-      // 3. バックエンドで確認処理
-      const confirmPaymentMethod = httpsCallable(functions, 'confirmPaymentMethod');
-      const result = await confirmPaymentMethod({
+      // 2. バックエンドでカード登録
+      const registerCard = httpsCallable(functions, 'registerCard');
+      const result = await registerCard({
         companyId,
-        setupIntentId: setupIntent.id,
+        tokenId: response.id,
       });
 
       onSuccess(result.data);
@@ -97,20 +127,19 @@ function CardRegistrationForm({ companyId, onSuccess, onError }) {
 
   return (
     <div className="space-y-4">
-      <div className="border border-gray-300 rounded-lg p-4 bg-white">
-        <CardElement
-          options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': { color: '#aab7c4' },
-              },
-              invalid: { color: '#9e2146' },
-            },
-            hidePostalCode: true,
-          }}
-        />
+      <div>
+        <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
+        <div ref={cardNumberRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1">有効期限</label>
+          <div ref={cardExpiryRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1">CVC</label>
+          <div ref={cardCvcRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+        </div>
       </div>
       {cardError && (
         <p className="text-sm text-red-600">{cardError}</p>
@@ -118,7 +147,7 @@ function CardRegistrationForm({ companyId, onSuccess, onError }) {
       <button
         type="button"
         onClick={handleCardSubmit}
-        disabled={!stripe || processing}
+        disabled={!ready || processing}
         className="inline-flex items-center space-x-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {processing ? (
@@ -1262,22 +1291,20 @@ export default function CompanySettings() {
                 {selectedPaymentMethod === 'card' && (
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-4">カード情報の入力</h3>
-                    {stripePromise ? (
-                      <Elements stripe={stripePromise}>
-                        <CardRegistrationForm
-                          companyId={companyId}
-                          onSuccess={handleCardSuccess}
-                          onError={(err) => setError(err.message || 'カード登録に失敗しました')}
-                        />
-                      </Elements>
+                    {PAYJP_PUBLIC_KEY && window.Payjp ? (
+                      <PayjpCardForm
+                        companyId={companyId}
+                        onSuccess={handleCardSuccess}
+                        onError={(err) => setError(err.message || 'カード登録に失敗しました')}
+                      />
                     ) : (
                       <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg text-sm">
-                        <strong>設定が必要です:</strong> Stripe公開キー（VITE_STRIPE_PUBLISHABLE_KEY）が設定されていません。
+                        <strong>設定が必要です:</strong> PAY.JP公開キー（VITE_PAYJP_PUBLIC_KEY）が設定されていません。
                         環境変数を設定してください。
                       </div>
                     )}
                     <p className="text-xs text-gray-500 mt-4">
-                      ※ カード情報はStripe社により安全に管理されます。当社サーバーにカード番号は保存されません。
+                      ※ カード情報はPAY.JP社により安全に管理されます。当社サーバーにカード番号は保存されません。
                     </p>
                   </div>
                 )}
