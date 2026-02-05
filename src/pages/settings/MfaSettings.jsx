@@ -87,12 +87,39 @@ export default function MfaSettings() {
       }
 
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+81${phoneNumber.replace(/^0/, '')}`;
+      console.log('送信先電話番号:', formattedPhone);
       const verificationId = await enrollSmsMfa(formattedPhone, recaptchaVerifierRef.current);
       setSmsVerificationId(verificationId);
       setSuccess('SMSを送信しました。認証コードを入力してください。');
     } catch (err) {
       console.error('SMS送信エラー:', err);
-      setError('SMSの送信に失敗しました。電話番号を確認してください。');
+      console.error('エラーコード:', err.code);
+      console.error('エラーメッセージ:', err.message);
+
+      // エラーコード別のメッセージ
+      let errorMessage = 'SMSの送信に失敗しました。';
+      if (err.code === 'auth/invalid-phone-number') {
+        errorMessage = '電話番号の形式が正しくありません。';
+      } else if (err.code === 'auth/quota-exceeded') {
+        errorMessage = 'SMS送信の上限に達しました。しばらく待ってから再試行してください。';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'リクエストが多すぎます。しばらく待ってから再試行してください。';
+      } else if (err.code === 'auth/captcha-check-failed') {
+        errorMessage = 'reCAPTCHA検証に失敗しました。ページを再読み込みしてください。';
+      } else if (err.code === 'auth/missing-phone-number') {
+        errorMessage = '電話番号が入力されていません。';
+      } else if (err.code === 'auth/user-disabled') {
+        errorMessage = 'このアカウントは無効化されています。';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMessage = 'SMS認証が有効化されていません。Firebase Consoleで設定を確認してください。';
+      } else if (err.code === 'auth/unsupported-first-factor') {
+        errorMessage = 'MFAを使用するには、まずメール認証が必要です。';
+      } else if (err.code === 'auth/unverified-email') {
+        errorMessage = 'MFAを使用するには、まずメールアドレスを確認してください。';
+      } else {
+        errorMessage = `SMSの送信に失敗しました。(${err.code || err.message})`;
+      }
+      setError(errorMessage);
     } finally {
       setSendingSms(false);
     }
