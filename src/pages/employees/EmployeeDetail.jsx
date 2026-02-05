@@ -23,6 +23,7 @@ import {
   Heart,
   AlertCircle
 } from 'lucide-react';
+import { useEmploymentTypes } from '../../hooks/useEmploymentTypes';
 
 // タブ定義
 const tabs = [
@@ -39,6 +40,7 @@ export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { companyId, isAdmin } = useAuth();
+  const { employmentTypes } = useEmploymentTypes();
   const isNew = id === 'new';
 
   const [activeTab, setActiveTab] = useState('basic');
@@ -524,10 +526,9 @@ export default function EmployeeDetail() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">選択してください</option>
-                  <option value="正社員">正社員</option>
-                  <option value="契約社員">契約社員</option>
-                  <option value="パート">パート</option>
-                  <option value="アルバイト">アルバイト</option>
+                  {employmentTypes.map((type) => (
+                    <option key={type.id} value={type.label}>{type.label}</option>
+                  ))}
                 </select>
               </div>
               <div>

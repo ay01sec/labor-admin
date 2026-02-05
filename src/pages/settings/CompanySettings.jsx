@@ -20,7 +20,12 @@ import {
   X,
   ClipboardCheck,
   Clock,
+  Users,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
+import { DEFAULT_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_COLORS } from '../../constants/employmentTypes';
 
 export default function CompanySettings() {
   const { companyId, isAdmin } = useAuth();
@@ -66,7 +71,8 @@ export default function CompanySettings() {
     attendanceSettings: {
       deductLunchBreak: true,
       lunchBreakMinutes: 60,
-    }
+    },
+    employmentTypes: DEFAULT_EMPLOYMENT_TYPES
   });
 
   // データ取得
@@ -115,7 +121,8 @@ export default function CompanySettings() {
             attendanceSettings: {
               deductLunchBreak: data.attendanceSettings?.deductLunchBreak !== false,
               lunchBreakMinutes: data.attendanceSettings?.lunchBreakMinutes ?? 60,
-            }
+            },
+            employmentTypes: data.employmentTypes?.length > 0 ? data.employmentTypes : DEFAULT_EMPLOYMENT_TYPES
           });
         }
       } catch (error) {
@@ -184,6 +191,7 @@ export default function CompanySettings() {
     { id: 'notification', label: '通知設定', icon: Bell },
     { id: 'approval', label: '承認設定', icon: ClipboardCheck },
     { id: 'attendance', label: '勤怠設定', icon: Clock },
+    { id: 'employmentType', label: '雇用形態', icon: Users },
   ];
 
   // 通知時刻の追加
@@ -248,6 +256,58 @@ export default function CompanySettings() {
         autoApprovalEmails: prev.approvalSettings.autoApprovalEmails.map((e, i) => i === index ? value : e)
       }
     }));
+  };
+
+  // 雇用形態の追加
+  const addEmploymentType = () => {
+    const newId = `custom_${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      employmentTypes: [...prev.employmentTypes, {
+        id: newId,
+        label: '新しい雇用形態',
+        color: 'gray',
+        isDefault: false
+      }]
+    }));
+  };
+
+  // 雇用形態の削除
+  const removeEmploymentType = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      employmentTypes: prev.employmentTypes.filter((_, i) => i !== index)
+    }));
+  };
+
+  // 雇用形態の更新
+  const updateEmploymentType = (index, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      employmentTypes: prev.employmentTypes.map((type, i) =>
+        i === index ? { ...type, [field]: value } : type
+      )
+    }));
+  };
+
+  // 雇用形態の並び替え（上へ）
+  const moveEmploymentTypeUp = (index) => {
+    if (index === 0) return;
+    setFormData(prev => {
+      const types = [...prev.employmentTypes];
+      [types[index - 1], types[index]] = [types[index], types[index - 1]];
+      return { ...prev, employmentTypes: types };
+    });
+  };
+
+  // 雇用形態の並び替え（下へ）
+  const moveEmploymentTypeDown = (index) => {
+    setFormData(prev => {
+      if (index === prev.employmentTypes.length - 1) return prev;
+      const types = [...prev.employmentTypes];
+      [types[index], types[index + 1]] = [types[index + 1], types[index]];
+      return { ...prev, employmentTypes: types };
+    });
   };
 
   if (loading) {
@@ -844,6 +904,104 @@ export default function CompanySettings() {
                 {formData.attendanceSettings.deductLunchBreak
                   ? `→ 昼休憩あり: ${9 - formData.attendanceSettings.lunchBreakMinutes / 60}時間 / 昼休憩なし: 9時間`
                   : '→ 昼休憩の有無に関わらず: 9時間'}
+              </div>
+            </div>
+          )}
+
+          {/* 雇用形態タブ */}
+          {activeTab === 'employmentType' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">雇用形態の設定</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  社員登録時に選択できる雇用形態を設定します。名称や表示色をカスタマイズできます。
+                </p>
+              </div>
+
+              {/* 雇用形態リスト */}
+              <div className="space-y-3">
+                {formData.employmentTypes.map((type, index) => (
+                  <div
+                    key={type.id}
+                    className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg"
+                  >
+                    {/* 並び替えボタン */}
+                    <div className="flex flex-col space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => moveEmploymentTypeUp(index)}
+                        disabled={index === 0}
+                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveEmploymentTypeDown(index)}
+                        disabled={index === formData.employmentTypes.length - 1}
+                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </div>
+
+                    {/* 色プレビュー */}
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${EMPLOYMENT_TYPE_COLORS[type.color]?.bg || 'bg-gray-100'} ${EMPLOYMENT_TYPE_COLORS[type.color]?.text || 'text-gray-800'}`}>
+                      {type.label}
+                    </div>
+
+                    {/* ラベル入力 */}
+                    <input
+                      type="text"
+                      value={type.label}
+                      onChange={(e) => updateEmploymentType(index, 'label', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      placeholder="雇用形態名"
+                    />
+
+                    {/* 色選択 */}
+                    <select
+                      value={type.color}
+                      onChange={(e) => updateEmploymentType(index, 'color', e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    >
+                      {Object.entries(EMPLOYMENT_TYPE_COLORS).map(([colorKey, colorValue]) => (
+                        <option key={colorKey} value={colorKey}>
+                          {colorValue.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* 削除ボタン */}
+                    <button
+                      type="button"
+                      onClick={() => removeEmploymentType(index)}
+                      disabled={type.isDefault}
+                      className={`p-2 rounded-lg transition-colors ${
+                        type.isDefault
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-red-600 hover:bg-red-50'
+                      }`}
+                      title={type.isDefault ? 'デフォルト項目は削除できません' : '削除'}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* 追加ボタン */}
+              <button
+                type="button"
+                onClick={addEmploymentType}
+                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm"
+              >
+                <Plus size={16} />
+                <span>雇用形態を追加</span>
+              </button>
+
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+                <strong>ヒント:</strong> デフォルトの5種類（正社員・契約社員・パート・アルバイト・外部）は削除できません。名称や色の変更は可能です。
               </div>
             </div>
           )}

@@ -33,7 +33,8 @@ export const employeeConfig = {
     { csvColumn: 'メールアドレス', field: 'contact.email', type: 'email', required: false },
 
     // ネスト構造: employment
-    { csvColumn: '雇用形態', field: 'employment.type', type: 'enum', options: ['正社員', '契約社員', 'パート', 'アルバイト'], required: false },
+    // 雇用形態は企業ごとにカスタマイズ可能なため、string型で任意の値を受け入れる
+    { csvColumn: '雇用形態', field: 'employment.type', type: 'string', required: false },
     { csvColumn: '入社日', field: 'employment.hireDate', type: 'date', required: false },
     { csvColumn: '退職日', field: 'employment.resignationDate', type: 'date', required: false },
     { csvColumn: '経験年数開始年', field: 'employment.experienceStartYear', type: 'number', required: false },

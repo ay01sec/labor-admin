@@ -24,6 +24,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import CsvImportModal from '../../components/CsvImport/CsvImportModal';
+import { useEmploymentTypes } from '../../hooks/useEmploymentTypes';
+import { getEmploymentTypeStyle } from '../../constants/employmentTypes';
 
 // ステータスバッジ
 function StatusBadge({ isActive }) {
@@ -39,17 +41,11 @@ function StatusBadge({ isActive }) {
 }
 
 // 雇用形態バッジ
-function EmploymentTypeBadge({ type }) {
-  const styles = {
-    '正社員': 'bg-blue-100 text-blue-800',
-    '契約社員': 'bg-purple-100 text-purple-800',
-    'パート': 'bg-orange-100 text-orange-800',
-    'アルバイト': 'bg-yellow-100 text-yellow-800'
-  };
-
+function EmploymentTypeBadge({ type, employmentTypes }) {
+  const style = getEmploymentTypeStyle(employmentTypes, type);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[type] || 'bg-gray-100 text-gray-800'}`}>
-      {type}
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+      {type || '-'}
     </span>
   );
 }
@@ -57,7 +53,8 @@ function EmploymentTypeBadge({ type }) {
 export default function EmployeeList() {
   const { companyId, isAdmin } = useAuth();
   const navigate = useNavigate();
-  
+  const { employmentTypes } = useEmploymentTypes();
+
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -219,10 +216,9 @@ export default function EmployeeList() {
             className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">雇用形態</option>
-            <option value="正社員">正社員</option>
-            <option value="契約社員">契約社員</option>
-            <option value="パート">パート</option>
-            <option value="アルバイト">アルバイト</option>
+            {employmentTypes.map((type) => (
+              <option key={type.id} value={type.label}>{type.label}</option>
+            ))}
           </select>
           <select
             value={filterStatus}
@@ -299,7 +295,7 @@ export default function EmployeeList() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <EmploymentTypeBadge type={employee.employment?.type} />
+                        <EmploymentTypeBadge type={employee.employment?.type} employmentTypes={employmentTypes} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {employee.employment?.hireDate?.toDate?.()?.toLocaleDateString('ja-JP') || '-'}
@@ -349,7 +345,7 @@ export default function EmployeeList() {
                     <StatusBadge isActive={employee.isActive} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <EmploymentTypeBadge type={employee.employment?.type} />
+                    <EmploymentTypeBadge type={employee.employment?.type} employmentTypes={employmentTypes} />
                     <span className="text-xs text-gray-500">{employee.employment?.role || '-'}</span>
                   </div>
                 </Link>
