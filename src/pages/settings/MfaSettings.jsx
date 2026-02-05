@@ -140,6 +140,7 @@ export default function MfaSettings() {
     setError('');
 
     try {
+      console.log('SMS認証コード検証開始:', { verificationId: smsVerificationId, codeLength: smsCode.length });
       await completeSmsMfaEnrollment(smsVerificationId, smsCode);
       setSuccess('SMS認証を登録しました');
       setShowSmsForm(false);
@@ -149,7 +150,22 @@ export default function MfaSettings() {
       setEnrolledFactors(getEnrolledMfaFactors());
     } catch (err) {
       console.error('SMS登録エラー:', err);
-      setError('認証コードが正しくありません');
+      console.error('エラーコード:', err.code);
+      console.error('エラーメッセージ:', err.message);
+
+      let errorMessage = '認証コードが正しくありません。';
+      if (err.code === 'auth/invalid-verification-code') {
+        errorMessage = '認証コードが正しくありません。もう一度確認してください。';
+      } else if (err.code === 'auth/code-expired') {
+        errorMessage = '認証コードの有効期限が切れました。再度コードを送信してください。';
+      } else if (err.code === 'auth/session-expired') {
+        errorMessage = 'セッションの有効期限が切れました。再度コードを送信してください。';
+      } else if (err.code === 'auth/invalid-verification-id') {
+        errorMessage = 'セッションが無効です。再度コードを送信してください。';
+      } else {
+        errorMessage = `認証に失敗しました。(${err.code || err.message})`;
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
