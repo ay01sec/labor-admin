@@ -97,7 +97,7 @@ export default function Login() {
 
       // カスタム2FA認証が必要な場合
       if (err.code === 'custom-2fa-required') {
-        await handleSendCustom2FACode();
+        await handleSendCustom2FACode(err.pending2FAData?.company?.id);
         return;
       }
 
@@ -190,11 +190,11 @@ export default function Login() {
   };
 
   // カスタム2FA: コード送信
-  const handleSendCustom2FACode = async () => {
+  const handleSendCustom2FACode = async (companyIdOverride = null) => {
     setSending2FACode(true);
     setError('');
     try {
-      const result = await send2FACode();
+      const result = await send2FACode(companyIdOverride);
       setCustom2FAStep('code');
       // 開発用: SMTPが未設定の場合はコードを表示
       if (result.devCode) {

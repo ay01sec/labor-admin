@@ -126,16 +126,18 @@ export function AuthProvider({ children }) {
 
       // 管理者の場合は2FA認証を要求
       if (needs2FA(userData)) {
-        setPending2FAUser({
-          id: user.uid,
-          ...userData
-        });
-        setPending2FACompany(company);
+        const pending2FAData = {
+          user: { id: user.uid, ...userData },
+          company: company
+        };
+        setPending2FAUser(pending2FAData.user);
+        setPending2FACompany(pending2FAData.company);
         setRequires2FA(true);
 
-        // 2FA必要エラーを投げる
+        // 2FA必要エラーを投げる（データを含める）
         const twoFAError = new Error('2段階認証が必要です');
         twoFAError.code = 'custom-2fa-required';
+        twoFAError.pending2FAData = pending2FAData;
         throw twoFAError;
       }
 
@@ -284,12 +286,13 @@ export function AuthProvider({ children }) {
   }
 
   // カスタム2FA: コード送信
-  async function send2FACode() {
-    if (!pending2FAUser || !pending2FACompany) {
+  async function send2FACode(companyIdOverride = null) {
+    const companyId = companyIdOverride || pending2FACompany?.id;
+    if (!companyId) {
       throw new Error('2FA認証セッションがありません');
     }
     const send2FACodeFn = httpsCallable(functions, 'send2FACode');
-    const result = await send2FACodeFn({ companyId: pending2FACompany.id });
+    const result = await send2FACodeFn({ companyId });
     return result.data;
   }
 
