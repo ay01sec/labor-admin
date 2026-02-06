@@ -267,7 +267,8 @@ export default function CompanySettings() {
       deductLunchBreak: true,
       lunchBreakMinutes: 60,
     },
-    employmentTypes: DEFAULT_EMPLOYMENT_TYPES
+    employmentTypes: DEFAULT_EMPLOYMENT_TYPES,
+    allowReportDeletion: false
   });
 
   // データ取得
@@ -317,7 +318,8 @@ export default function CompanySettings() {
               deductLunchBreak: data.attendanceSettings?.deductLunchBreak !== false,
               lunchBreakMinutes: data.attendanceSettings?.lunchBreakMinutes ?? 60,
             },
-            employmentTypes: data.employmentTypes?.length > 0 ? data.employmentTypes : DEFAULT_EMPLOYMENT_TYPES
+            employmentTypes: data.employmentTypes?.length > 0 ? data.employmentTypes : DEFAULT_EMPLOYMENT_TYPES,
+            allowReportDeletion: data.allowReportDeletion || false
           });
         }
       } catch (error) {
@@ -868,6 +870,37 @@ export default function CompanySettings() {
                       />
                     </div>
                   )}
+                </div>
+              </div>
+
+              <hr />
+
+              {/* 日報削除設定 */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">日報削除機能</h2>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="text-orange-500 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="flex-1">
+                      <p className="text-sm text-orange-700 font-medium mb-2">
+                        日報の削除を許可すると、日報管理画面から日報を完全に削除できるようになります。
+                      </p>
+                      <p className="text-sm text-orange-600 mb-4">
+                        削除された日報はデータベースから完全に削除され、復元できません。
+                      </p>
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.allowReportDeletion}
+                          onChange={(e) => handleChange('allowReportDeletion', e.target.checked)}
+                          className="w-5 h-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          日報の削除を許可する
+                        </span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -4,7 +4,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
+  deleteDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../services/firebase';
@@ -19,6 +23,8 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -89,6 +95,12 @@ export default function ReportList() {
   const [csvLoading, setCsvLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
 
+  // 削除機能用
+  const [selectedReports, setSelectedReports] = useState(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [allowReportDeletion, setAllowReportDeletion] = useState(false);
+
   // データ取得
   useEffect(() => {
     if (!companyId) return;
@@ -96,6 +108,13 @@ export default function ReportList() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // 会社設定取得（削除許可フラグ）
+        const companyDoc = await getDoc(doc(db, 'companies', companyId));
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data();
+          setAllowReportDeletion(companyData.allowReportDeletion || false);
+        }
+
         // ユーザー一覧取得
         const usersRef = collection(db, 'companies', companyId, 'users');
         const usersSnapshot = await getDocs(usersRef);
@@ -401,6 +420,53 @@ export default function ReportList() {
     name: data.siteName,
   }));
 
+  // チェックボックス操作
+  const handleSelectReport = (reportId) => {
+    setSelectedReports((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(reportId)) {
+        newSet.delete(reportId);
+      } else {
+        newSet.add(reportId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedReports.size === paginatedReports.length) {
+      setSelectedReports(new Set());
+    } else {
+      setSelectedReports(new Set(paginatedReports.map((r) => r.id)));
+    }
+  };
+
+  // 一括削除処理
+  const handleBulkDelete = async () => {
+    if (selectedReports.size === 0) return;
+
+    setDeleting(true);
+    try {
+      const batch = writeBatch(db);
+      for (const reportId of selectedReports) {
+        const reportRef = doc(db, 'companies', companyId, 'dailyReports', reportId);
+        batch.delete(reportRef);
+      }
+      await batch.commit();
+
+      // ローカル状態を更新
+      setReports((prev) => prev.filter((r) => !selectedReports.has(r.id)));
+      setSelectedReports(new Set());
+      setShowDeleteModal(false);
+      toast.success(`${selectedReports.size}件の日報を削除しました`);
+    } catch (error) {
+      console.error('削除エラー:', error);
+      toast.error('削除に失敗しました');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -418,6 +484,15 @@ export default function ReportList() {
           <span>日報管理</span>
         </h1>
         <div className="flex gap-2">
+          {allowReportDeletion && selectedReports.size > 0 && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <Trash2 size={20} />
+              <span>{selectedReports.size}件を削除</span>
+            </button>
+          )}
           <button
             onClick={() => setShowPdfModal(true)}
             className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -523,6 +598,16 @@ export default function ReportList() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    {allowReportDeletion && (
+                      <th className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={paginatedReports.length > 0 && selectedReports.size === paginatedReports.length}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </th>
+                    )}
                     {[
                       { key: 'reportDate', label: '実施日' },
                       { key: 'siteName', label: '現場名' },
@@ -549,7 +634,17 @@ export default function ReportList() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {paginatedReports.map((report) => (
-                    <tr key={report.id} className="hover:bg-gray-50">
+                    <tr key={report.id} className={`hover:bg-gray-50 ${selectedReports.has(report.id) ? 'bg-blue-50' : ''}`}>
+                      {allowReportDeletion && (
+                        <td className="px-4 py-4 w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedReports.has(report.id)}
+                            onChange={() => handleSelectReport(report.id)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
                           <Calendar size={16} className="text-gray-400" />
@@ -591,23 +686,37 @@ export default function ReportList() {
             {/* モバイル: カード表示 */}
             <div className="md:hidden divide-y divide-gray-200">
               {paginatedReports.map((report) => (
-                <Link
+                <div
                   key={report.id}
-                  to={`/reports/${report.id}`}
-                  className="block p-4 hover:bg-gray-50 active:bg-gray-100"
+                  className={`p-4 hover:bg-gray-50 ${selectedReports.has(report.id) ? 'bg-blue-50' : ''}`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatDate(report.reportDate)}
-                    </span>
-                    <StatusBadge status={report.status} />
+                  <div className="flex items-start gap-3">
+                    {allowReportDeletion && (
+                      <input
+                        type="checkbox"
+                        checked={selectedReports.has(report.id)}
+                        onChange={() => handleSelectReport(report.id)}
+                        className="w-4 h-4 mt-1 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    )}
+                    <Link
+                      to={`/reports/${report.id}`}
+                      className="flex-1"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-900">
+                          {formatDate(report.reportDate)}
+                        </span>
+                        <StatusBadge status={report.status} />
+                      </div>
+                      <p className="text-sm text-gray-800 truncate">{report.siteName || '-'}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs text-gray-500">{report.createdByName || '-'}</span>
+                        <span className="text-xs text-gray-500">{report.workers?.length || 0}名</span>
+                      </div>
+                    </Link>
                   </div>
-                  <p className="text-sm text-gray-800 truncate">{report.siteName || '-'}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-xs text-gray-500">{report.createdByName || '-'}</span>
-                    <span className="text-xs text-gray-500">{report.workers?.length || 0}名</span>
-                  </div>
-                </Link>
+                </div>
               ))}
             </div>
 
@@ -774,6 +883,49 @@ export default function ReportList() {
                 >
                   <Download size={18} />
                   <span>{pdfLoading ? '生成中...' : 'ダウンロード'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 削除確認モーダル */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="text-red-600" size={20} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800">日報の削除</h3>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-800 font-medium">
+                  {selectedReports.size}件の日報を削除しますか？
+                </p>
+                <p className="text-red-700 text-sm mt-2">
+                  この操作は取り消せません。削除された日報は完全に失われます。
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={deleting}
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 size={18} />
+                  <span>{deleting ? '削除中...' : '削除する'}</span>
                 </button>
               </div>
             </div>
