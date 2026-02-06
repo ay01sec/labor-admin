@@ -93,26 +93,29 @@ function AdminRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { currentUser } = useAuth();
+  const { currentUser, requires2FA } = useAuth();
+
+  // 2FA待ちの場合はログイン未完了として扱う
+  const isFullyLoggedIn = currentUser && !requires2FA;
 
   return (
     <Routes>
       {/* ログイン */}
       <Route
         path="/login"
-        element={currentUser ? <Navigate to="/" /> : <Login />}
+        element={isFullyLoggedIn ? <Navigate to="/" /> : <Login />}
       />
 
       {/* パスワードリセット */}
       <Route
         path="/forgot-password"
-        element={currentUser ? <Navigate to="/" /> : <ForgotPassword />}
+        element={isFullyLoggedIn ? <Navigate to="/" /> : <ForgotPassword />}
       />
 
       {/* 新規利用開始手続き */}
       <Route
         path="/register"
-        element={currentUser ? <Navigate to="/" /> : <Register />}
+        element={isFullyLoggedIn ? <Navigate to="/" /> : <Register />}
       />
 
       {/* 認証が必要なルート */}
