@@ -43,6 +43,11 @@ import AttendanceSummary from './pages/reports/AttendanceSummary';
 // Help Page
 import HelpPage from './pages/HelpPage';
 
+// Legal Pages
+import TermsOfService from './pages/legal/TermsOfService';
+import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import Tokushoho from './pages/legal/Tokushoho';
+
 // Placeholder pages (開発中)
 const PlaceholderPage = ({ title }) => (
   <div className="bg-white rounded-xl shadow-sm p-8 text-center">
@@ -179,6 +184,11 @@ function AppRoutes() {
 
         {/* ヘルプ */}
         <Route path="/help" element={<HelpPage />} />
+
+        {/* 法務関連ページ */}
+        <Route path="/legal/terms" element={<TermsOfService />} />
+        <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+        <Route path="/legal/tokushoho" element={<Tokushoho />} />
       </Route>
 
       {/* 404 */}
