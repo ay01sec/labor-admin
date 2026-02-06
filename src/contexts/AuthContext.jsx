@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
   const [pending2FACompany, setPending2FACompany] = useState(null);
   const [twoFAVerified, setTwoFAVerified] = useState(false);
   const is2FAPendingRef = useRef(false); // refでも追跡
+  const loginInProgressRef = useRef(false); // ログイン処理中フラグ
   const [twoFACodeSent, setTwoFACodeSent] = useState(false); // コード送信済み
   const [twoFADevCode, setTwoFADevCode] = useState(null); // 開発用コード
 
@@ -71,10 +72,14 @@ export function AuthProvider({ children }) {
 
   // 企業コード + メールアドレス + パスワードでログイン
   async function login(companyCode, email, password) {
-    // 1. 先に企業コードで企業を検索（未認証状態で検証）
-    const company = await findCompanyByCode(companyCode);
+    // ログイン処理開始（onAuthStateChangedの干渉を防ぐ）
+    loginInProgressRef.current = true;
+    console.log('Login started, loginInProgressRef set to true');
 
     try {
+      // 1. 先に企業コードで企業を検索（未認証状態で検証）
+      const company = await findCompanyByCode(companyCode);
+
       // 2. Firebase Authenticationでログイン
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -93,6 +98,12 @@ export function AuthProvider({ children }) {
         mfaError.resolver = resolver;
         throw mfaError;
       }
+      // 2FAエラーの場合はフラグを維持（Login.jsxで処理継続）
+      if (error.code === 'custom-2fa-required') {
+        throw error;
+      }
+      // その他のエラーの場合はフラグをリセット
+      loginInProgressRef.current = false;
       throw error;
     }
   }
@@ -316,9 +327,12 @@ export function AuthProvider({ children }) {
     await verify2FACodeFn({ code });
 
     // 検証成功 - ログイン完了処理
+    loginInProgressRef.current = false; // ログイン処理完了
     is2FAPendingRef.current = false; // refをリセット
     setTwoFAVerified(true);
     setRequires2FA(false);
+    setTwoFACodeSent(false); // コード送信状態もリセット
+    setTwoFADevCode(null);
 
     // ユーザー情報を設定
     setCompanyId(pending2FACompany.id);
@@ -337,6 +351,7 @@ export function AuthProvider({ children }) {
 
   // カスタム2FA: キャンセル（ログアウト）
   async function cancel2FA() {
+    loginInProgressRef.current = false; // ログイン処理終了
     is2FAPendingRef.current = false; // refをリセット
     setPending2FAUser(null);
     setPending2FACompany(null);
@@ -427,12 +442,13 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('onAuthStateChanged fired, user:', !!user, 'loginInProgress:', loginInProgressRef.current, 'is2FAPending:', is2FAPendingRef.current);
       setCurrentUser(user);
 
       if (user) {
-        // 2FA認証待ちの場合はfetchUserInfoをスキップ
-        if (is2FAPendingRef.current) {
-          console.log('2FA pending, skipping fetchUserInfo');
+        // ログイン処理中または2FA認証待ちの場合はfetchUserInfoをスキップ
+        if (loginInProgressRef.current || is2FAPendingRef.current) {
+          console.log('Login in progress or 2FA pending, skipping fetchUserInfo');
           setLoading(false);
           return;
         }
@@ -444,7 +460,7 @@ export function AuthProvider({ children }) {
           await logout();
         }
       }
-      
+
       setLoading(false);
     });
 

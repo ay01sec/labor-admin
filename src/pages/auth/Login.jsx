@@ -48,15 +48,8 @@ export default function Login() {
   const [custom2FACode, setCustom2FACode] = useState('');
   const [sending2FACode, setSending2FACode] = useState(false);
 
-  // デバッグ: twoFACodeSentの変化を監視
-  useEffect(() => {
-    console.log('twoFACodeSent changed to:', twoFACodeSent);
-  }, [twoFACodeSent]);
-
-  // デバッグ: twoFADevCodeの変化を監視
-  useEffect(() => {
-    console.log('twoFADevCode changed to:', twoFADevCode);
-  }, [twoFADevCode]);
+  // デバッグ: レンダリング時の状態をログ
+  console.log('Login render - twoFACodeSent:', twoFACodeSent, 'twoFADevCode:', twoFADevCode, 'requires2FA:', requires2FA, 'pending2FAUser:', !!pending2FAUser);
 
   // reCAPTCHA初期化
   useEffect(() => {
