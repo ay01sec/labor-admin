@@ -132,13 +132,32 @@ export default function Dashboard() {
         });
 
         // 今日の日報提出状況
-        const activeSites = sitesSnap.docs.map(d => d.id);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayStart = Timestamp.fromDate(today);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         const todayEnd = Timestamp.fromDate(tomorrow);
+
+        // 今日が工期内の現場のみをフィルタリング
+        const activeSitesInPeriod = sitesSnap.docs.filter(d => {
+          const data = d.data();
+          // startDateとendDateをDateオブジェクトに変換
+          const startDate = data.startDate?.toDate ? data.startDate.toDate() : (data.startDate ? new Date(data.startDate) : null);
+          const endDate = data.endDate?.toDate ? data.endDate.toDate() : (data.endDate ? new Date(data.endDate) : null);
+
+          // 工期が設定されていない場合はステータスがactiveなら含める
+          if (!startDate && !endDate) return true;
+
+          // 今日が工期内かチェック
+          const todayDate = new Date();
+          todayDate.setHours(0, 0, 0, 0);
+
+          const isAfterStart = !startDate || todayDate >= startDate;
+          const isBeforeEnd = !endDate || todayDate <= endDate;
+
+          return isAfterStart && isBeforeEnd;
+        }).map(d => d.id);
 
         const todayReportsSnap = await getDocs(
           query(
@@ -152,13 +171,16 @@ export default function Dashboard() {
         todayReportsSnap.docs.forEach(d => {
           const data = d.data();
           if (data.status === 'submitted' || data.status === 'approved') {
-            submittedSiteIds.add(data.siteId);
+            // 工期内の現場のみカウント
+            if (activeSitesInPeriod.includes(data.siteId)) {
+              submittedSiteIds.add(data.siteId);
+            }
           }
         });
 
         setTodayProgress({
           submitted: submittedSiteIds.size,
-          total: activeSites.length,
+          total: activeSitesInPeriod.length,
         });
 
         // 最近の日報取得

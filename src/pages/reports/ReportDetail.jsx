@@ -8,6 +8,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../services/firebase';
 import {
   ArrowLeft,
@@ -19,6 +20,10 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Download,
+  QrCode,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -53,6 +58,8 @@ export default function ReportDetail() {
   const [processing, setProcessing] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   // データ取得
   useEffect(() => {
@@ -127,6 +134,37 @@ export default function ReportDetail() {
       toast.error('承認に失敗しました');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // PDF・QRコード生成
+  const handleGeneratePdf = async () => {
+    if (!companyId || !id) return;
+
+    setGeneratingPdf(true);
+    try {
+      const functions = getFunctions(undefined, 'asia-northeast1');
+      const generateReportPdfWithQR = httpsCallable(functions, 'generateReportPdfWithQR');
+      const result = await generateReportPdfWithQR({
+        companyId,
+        reportId: id,
+      });
+
+      if (result.data?.success) {
+        setReport((prev) => ({
+          ...prev,
+          pdfUrl: result.data.pdfUrl,
+          qrCodeUrl: result.data.qrCodeUrl,
+        }));
+        toast.success('PDF・QRコードを生成しました');
+        // 生成後、PDFを新しいタブで開く
+        window.open(result.data.pdfUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('PDF生成エラー:', error);
+      toast.error('PDF生成に失敗しました');
+    } finally {
+      setGeneratingPdf(false);
     }
   };
 
@@ -246,13 +284,57 @@ export default function ReportDetail() {
       {/* 承認済み情報 */}
       {report.status === 'approved' && report.approval?.approvedAt && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <div className="flex items-center space-x-2 text-green-800">
-            <CheckCircle size={20} />
-            <span className="font-medium">承認済み</span>
-          </div>
-          <div className="mt-2 text-sm text-green-700">
-            <p>承認者: {report.approval.approvedByName}</p>
-            <p>承認日時: {formatDateTime(report.approval.approvedAt)}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-2 text-green-800">
+                <CheckCircle size={20} />
+                <span className="font-medium">承認済み</span>
+              </div>
+              <div className="mt-2 text-sm text-green-700">
+                <p>承認者: {report.approval.approvedByName}</p>
+                <p>承認日時: {formatDateTime(report.approval.approvedAt)}</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {report.pdfUrl ? (
+                <>
+                  <a
+                    href={report.pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
+                  >
+                    <ExternalLink size={16} />
+                    <span>PDF表示</span>
+                  </a>
+                  <button
+                    onClick={() => setShowQrModal(true)}
+                    className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm"
+                  >
+                    <QrCode size={16} />
+                    <span>QRコード</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleGeneratePdf}
+                  disabled={generatingPdf}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
+                >
+                  {generatingPdf ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>生成中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      <span>PDF・QR生成</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -470,6 +552,44 @@ export default function ReportDetail() {
                 >
                   {processing ? '処理中...' : '差戻しする'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QRコードモーダル */}
+      {showQrModal && report.qrCodeUrl && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800">QRコード</h3>
+                <button
+                  onClick={() => setShowQrModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={24} />
+                </button>
+              </div>
+              <div className="flex flex-col items-center">
+                <img
+                  src={report.qrCodeUrl}
+                  alt="QRコード"
+                  className="w-64 h-64 border border-gray-200 rounded-lg"
+                />
+                <p className="text-sm text-gray-500 mt-4 text-center">
+                  このQRコードをスキャンすると日報PDFが表示されます
+                </p>
+                <a
+                  href={report.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <ExternalLink size={16} />
+                  <span>PDFを開く</span>
+                </a>
               </div>
             </div>
           </div>
