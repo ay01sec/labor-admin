@@ -8,7 +8,6 @@ import {
   updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../services/firebase';
 import {
   ArrowLeft,
@@ -20,10 +19,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Download,
   QrCode,
   ExternalLink,
-  Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -58,7 +55,6 @@ export default function ReportDetail() {
   const [processing, setProcessing] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
 
   // データ取得
@@ -134,37 +130,6 @@ export default function ReportDetail() {
       toast.error('承認に失敗しました');
     } finally {
       setProcessing(false);
-    }
-  };
-
-  // PDF・QRコード生成
-  const handleGeneratePdf = async () => {
-    if (!companyId || !id) return;
-
-    setGeneratingPdf(true);
-    try {
-      const functions = getFunctions(undefined, 'asia-northeast1');
-      const generateReportPdfWithQR = httpsCallable(functions, 'generateReportPdfWithQR');
-      const result = await generateReportPdfWithQR({
-        companyId,
-        reportId: id,
-      });
-
-      if (result.data?.success) {
-        setReport((prev) => ({
-          ...prev,
-          pdfUrl: result.data.pdfUrl,
-          qrCodeUrl: result.data.qrCodeUrl,
-        }));
-        toast.success('PDF・QRコードを生成しました');
-        // 生成後、PDFを新しいタブで開く
-        window.open(result.data.pdfUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('PDF生成エラー:', error);
-      toast.error('PDF生成に失敗しました');
-    } finally {
-      setGeneratingPdf(false);
     }
   };
 
@@ -307,32 +272,20 @@ export default function ReportDetail() {
                     <ExternalLink size={16} />
                     <span>PDF表示</span>
                   </a>
-                  <button
-                    onClick={() => setShowQrModal(true)}
-                    className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm"
-                  >
-                    <QrCode size={16} />
-                    <span>QRコード</span>
-                  </button>
+                  {report.qrCodeUrl && (
+                    <button
+                      onClick={() => setShowQrModal(true)}
+                      className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm"
+                    >
+                      <QrCode size={16} />
+                      <span>QRコード</span>
+                    </button>
+                  )}
                 </>
               ) : (
-                <button
-                  onClick={handleGeneratePdf}
-                  disabled={generatingPdf}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
-                >
-                  {generatingPdf ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>生成中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download size={16} />
-                      <span>PDF・QR生成</span>
-                    </>
-                  )}
-                </button>
+                <span className="text-sm text-gray-500">
+                  PDF/QRは承認時に自動生成されます
+                </span>
               )}
             </div>
           </div>
