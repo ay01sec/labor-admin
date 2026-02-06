@@ -1,9 +1,12 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
+const sgMail = require("@sendgrid/mail");
 const PDFDocument = require("pdfkit");
 const JSZip = require("jszip");
 const QRCode = require("qrcode");
@@ -637,7 +640,8 @@ exports.generateBulkPdf = onCall(
 
       // 各日報のPDFを生成
       for (const report of reports) {
-        const pdfBuffer = await generateReportPdf(report, companyData, fontPath);
+        const signatureImageBuffer = await downloadSignatureImage(report.clientSignature?.imageUrl);
+        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer);
         const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
         const dateStr = formatDateForFilename(reportDate);
         const siteName = (report.siteName || "不明").replace(/[/\\?%*:|"<>]/g, "_");
@@ -659,158 +663,203 @@ exports.generateBulkPdf = onCall(
 );
 
 /**
- * 日報PDFを生成
+ * 署名画像をダウンロード
  */
-async function generateReportPdf(report, companyData, fontPath) {
+async function downloadSignatureImage(imageUrl) {
+  if (!imageUrl) return null;
+  const https = require("https");
+  return new Promise((resolve) => {
+    https.get(imageUrl, (res) => {
+      if (res.statusCode !== 200) {
+        resolve(null);
+        return;
+      }
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", () => resolve(null));
+    }).on("error", () => resolve(null));
+  });
+}
+
+/**
+ * 日報PDFを生成（テンプレート形式）
+ */
+function generateReportPdf(report, companyData, fontPath, signatureImageBuffer) {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({
-        size: "A4",
-        margins: { top: 40, bottom: 40, left: 40, right: 40 },
-      });
+      const doc = new PDFDocument({ size: "A4", margin: 50 });
+      const buffers = [];
 
-      const chunks = [];
-      doc.on("data", (chunk) => chunks.push(chunk));
-      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
       doc.on("error", reject);
 
-      // フォント登録
       doc.registerFont("NotoSans", fontPath);
       doc.font("NotoSans");
 
-      const pageWidth = doc.page.width - 80;
-      const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
-      const weatherMap = { sunny: "晴れ", cloudy: "曇り", rainy: "雨", snowy: "雪" };
+      const LEFT = 50;
+      const RIGHT = 545;
+      const WIDTH = RIGHT - LEFT;
 
-      // ヘッダー
-      doc.fontSize(18).text("作業日報", { align: "center" });
+      // 日付フォーマット
+      const reportDate = report.reportDate?.toDate
+        ? report.reportDate.toDate()
+        : new Date(report.reportDate);
+      const dateStr = `${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
+
+      const submittedAt = report.submittedAt?.toDate
+        ? report.submittedAt.toDate()
+        : report.submittedAt ? new Date(report.submittedAt) : new Date();
+      const reportDateStr = `${submittedAt.getMonth() + 1}月${submittedAt.getDate()}日`;
+
+      // === 報告日 ===
+      doc.fontSize(10).fillColor("#000000");
+      doc.text(`報告日：${reportDateStr}`, LEFT, 50);
       doc.moveDown(0.5);
 
-      // 会社名
-      if (companyData.companyName) {
-        doc.fontSize(10).text(companyData.companyName, { align: "right" });
+      // === ヘッダー2行構成 ===
+      const headerTop = doc.y;
+      const row1H = 55;        // 上段（元請確認欄）高さを大きく
+      const row2H = 22;        // 下段（作業日報）通常高さ
+      const labelW = 70;       // 「元請確認欄」「作業日報」列
+      const signW = 200;       // サイン列
+      const infoLabelW = 50;   // 「実施日」「作成者」列
+      const col1 = LEFT;
+      const col2 = LEFT + labelW;
+      const col3 = col2 + signW;
+      const col4 = col3 + infoLabelW;
+
+      // 上段: 元請確認欄 | サイン | 実施日 | 日付
+      doc.rect(col1, headerTop, WIDTH, row1H).stroke();
+      doc.moveTo(col2, headerTop).lineTo(col2, headerTop + row1H).stroke();
+      doc.moveTo(col3, headerTop).lineTo(col3, headerTop + row1H).stroke();
+      doc.moveTo(col4, headerTop).lineTo(col4, headerTop + row1H).stroke();
+
+      doc.fontSize(9);
+      doc.text("元請確認欄", col1 + 4, headerTop + (row1H / 2) - 5);
+      doc.text("実施日", col3 + 4, headerTop + (row1H / 2) - 5);
+      doc.text(dateStr, col4 + 4, headerTop + (row1H / 2) - 5);
+
+      // サイン画像（上段のみ: col2〜col3）
+      if (signatureImageBuffer) {
+        try {
+          const sigPad = 4;
+          doc.image(signatureImageBuffer, col2 + sigPad, headerTop + sigPad, {
+            fit: [signW - sigPad * 2, row1H - sigPad * 2],
+          });
+        } catch (e) {
+          console.error("サイン画像埋め込みエラー:", e);
+        }
       }
-      doc.moveDown();
 
-      // 基本情報テーブル
-      const y1 = doc.y;
-      doc.fontSize(10);
+      // 下段: 作業日報 | （空白） | 作成者 | 名前
+      const row2Top = headerTop + row1H;
+      doc.rect(col1, row2Top, WIDTH, row2H).stroke();
+      doc.moveTo(col3, row2Top).lineTo(col3, row2Top + row2H).stroke();
+      doc.moveTo(col4, row2Top).lineTo(col4, row2Top + row2H).stroke();
 
-      // 左側情報
-      doc.text(`実施日: ${formatDateJapanese(reportDate)}`, 40);
-      doc.text(`現場名: ${report.siteName || "-"}`, 40);
-      doc.text(`天候: ${weatherMap[report.weather] || report.weather || "-"}`, 40);
+      doc.text("作業日報", col1 + 4, row2Top + 6);
+      doc.text("作成者", col3 + 4, row2Top + 6);
+      doc.text(report.createdByName || "", col4 + 4, row2Top + 6);
 
-      // 右側情報
-      doc.text(`作成者: ${report.createdByName || "-"}`, 300, y1);
-      if (report.submittedAt) {
-        const submittedDate = report.submittedAt?.toDate ? report.submittedAt.toDate() : new Date(report.submittedAt);
-        doc.text(`送信日時: ${formatDateTimeJapanese(submittedDate)}`, 300);
-      }
+      // === 現場名 ===
+      const siteTop = row2Top + row2H + 10;
+      doc.fontSize(11);
+      doc.text("現場名", LEFT, siteTop, { continued: true });
+      doc.text(`     ${report.siteName || ""}`);
+      doc.moveDown(0.5);
 
-      doc.moveDown(2);
-
-      // 作業員テーブル（5人/ページ）
+      // === 作業員テーブル ===
+      const tableTop = doc.y;
+      const colWidths = [100, 80, 80, 70, 165];
+      const headers = ["氏名", "開始時間", "終了時間", "昼休憩なし", "備考及び作業内容"];
+      const rowHeight = 22;
+      const totalRows = 9; // 固定9行（リファレンス準拠）
       const workers = report.workers || [];
-      const workersPerPage = 5;
-      const totalPages = Math.ceil(workers.length / workersPerPage) || 1;
 
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) {
-          doc.addPage();
-          doc.font("NotoSans");
-          doc.fontSize(12).text(`作業日報（${page + 1}/${totalPages}ページ）`, { align: "center" });
-          doc.moveDown();
+      // テーブルヘッダー
+      doc.rect(LEFT, tableTop, WIDTH, rowHeight).stroke();
+      doc.fontSize(9).fillColor("#000000");
+      let x = LEFT;
+      headers.forEach((header, i) => {
+        doc.text(header, x + 3, tableTop + 6, { width: colWidths[i] - 6 });
+        if (i < headers.length - 1) {
+          doc.moveTo(x + colWidths[i], tableTop)
+            .lineTo(x + colWidths[i], tableTop + rowHeight).stroke();
+        }
+        x += colWidths[i];
+      });
+
+      // テーブル行
+      for (let row = 0; row < totalRows; row++) {
+        const y = tableTop + rowHeight * (row + 1);
+        doc.rect(LEFT, y, WIDTH, rowHeight).stroke();
+
+        x = LEFT;
+        const worker = workers[row];
+
+        // 各列の区切り線
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.moveTo(x, y).lineTo(x, y + rowHeight).stroke();
         }
 
-        // 作業員セクション
-        doc.fontSize(12).text(`作業員一覧（${workers.length}名）`, 40);
-        doc.moveDown(0.5);
-
-        // テーブルヘッダー
-        const tableTop = doc.y;
-        const colWidths = [120, 70, 70, 60, 195];
-        const headers = ["氏名", "開始", "終了", "昼休憩", "備考/作業内容"];
-
-        doc.fontSize(9);
-        drawTableRow(doc, tableTop, colWidths, headers, true);
-
-        // 作業員データ
-        let currentY = tableTop + 20;
-        const startIdx = page * workersPerPage;
-        const endIdx = Math.min(startIdx + workersPerPage, workers.length);
-
-        for (let i = startIdx; i < endIdx; i++) {
-          const worker = workers[i];
-          const rowData = [
-            worker.name || "-",
-            worker.startTime || "-",
-            worker.endTime || "-",
-            worker.noLunchBreak ? "なし" : "あり",
-            worker.remarks || "-",
-          ];
-          drawTableRow(doc, currentY, colWidths, rowData, false);
-          currentY += 20;
+        if (worker) {
+          x = LEFT;
+          // 氏名
+          doc.text(worker.name || "", x + 3, y + 6, { width: colWidths[0] - 6 });
+          x += colWidths[0];
+          // 開始時間
+          doc.text(worker.startTime || "", x + 3, y + 6, { width: colWidths[1] - 6 });
+          x += colWidths[1];
+          // 終了時間
+          doc.text(worker.endTime || "", x + 3, y + 6, { width: colWidths[2] - 6 });
+          x += colWidths[2];
+          // 昼休憩なしチェックボックス
+          const cbX = x + (colWidths[3] / 2) - 6;
+          const cbY = y + 5;
+          doc.rect(cbX, cbY, 12, 12).stroke();
+          if (worker.noLunchBreak) {
+            doc.moveTo(cbX + 2, cbY + 6).lineTo(cbX + 5, cbY + 10)
+              .lineTo(cbX + 10, cbY + 2).stroke();
+          }
+          x += colWidths[3];
+          // 備考
+          doc.text(worker.remarks || "", x + 3, y + 6, { width: colWidths[4] - 6 });
+        } else {
+          // 空行のチェックボックスのみ描画
+          x = LEFT + colWidths[0] + colWidths[1] + colWidths[2];
+          const cbX = x + (colWidths[3] / 2) - 6;
+          const cbY = y + 5;
+          doc.rect(cbX, cbY, 12, 12).stroke();
         }
-
-        doc.y = currentY + 10;
       }
 
-      // 連絡事項
+      // === 連絡事項 ===
+      const notesTop = tableTop + rowHeight * (totalRows + 1) + 15;
+      const notesHeight = 100;
+      doc.rect(LEFT, notesTop, WIDTH, notesHeight).stroke();
+      doc.fontSize(9).text("連絡事項", LEFT + 5, notesTop + 5);
       if (report.notes) {
-        doc.moveDown();
-        doc.fontSize(12).text("連絡事項", 40);
-        doc.moveDown(0.5);
-        doc.fontSize(10).text(report.notes, 40, doc.y, { width: pageWidth });
+        doc.fontSize(9).text(report.notes, LEFT + 10, notesTop + 22, {
+          width: WIDTH - 20,
+          height: notesHeight - 30,
+        });
       }
 
-      // 署名情報
-      if (report.clientSignature?.signedAt) {
-        doc.moveDown();
-        const signedAt = report.clientSignature.signedAt?.toDate
-          ? report.clientSignature.signedAt.toDate()
-          : new Date(report.clientSignature.signedAt);
-        doc.fontSize(10).text(`元請確認サイン: ${formatDateTimeJapanese(signedAt)}`, 40);
-      }
-
-      // 承認情報
-      if (report.approval?.approvedAt) {
-        doc.moveDown();
-        const approvedAt = report.approval.approvedAt?.toDate
-          ? report.approval.approvedAt.toDate()
-          : new Date(report.approval.approvedAt);
-        doc.fontSize(10).text(`承認: ${report.approval.approvedByName || "-"} (${formatDateTimeJapanese(approvedAt)})`, 40);
-      }
+      // === フッター（企業名）===
+      doc.fontSize(10).text(
+        companyData?.companyName || "",
+        LEFT,
+        notesTop + notesHeight + 15
+      );
 
       doc.end();
     } catch (error) {
       reject(error);
     }
   });
-}
-
-/**
- * テーブル行を描画
- */
-function drawTableRow(doc, y, colWidths, data, isHeader) {
-  let x = 40;
-  const rowHeight = 18;
-
-  if (isHeader) {
-    doc.rect(x, y, colWidths.reduce((a, b) => a + b, 0), rowHeight).fill("#f3f4f6");
-    doc.fillColor("#374151");
-  } else {
-    doc.rect(x, y, colWidths.reduce((a, b) => a + b, 0), rowHeight).stroke("#e5e7eb");
-    doc.fillColor("#000000");
-  }
-
-  for (let i = 0; i < data.length; i++) {
-    const text = String(data[i] || "-");
-    const maxChars = Math.floor(colWidths[i] / 6);
-    const displayText = text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
-    doc.text(displayText, x + 4, y + 4, { width: colWidths[i] - 8, height: rowHeight - 4, lineBreak: false });
-    x += colWidths[i];
-  }
 }
 
 /**
@@ -875,8 +924,11 @@ exports.generateReportPdfWithQR = onCall(
       // フォントパス
       const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
 
+      // 署名画像をダウンロード
+      const signatureImageBuffer = await downloadSignatureImage(report.clientSignature?.imageUrl);
+
       // PDF生成
-      const pdfBuffer = await generateReportPdf(report, companyData, fontPath);
+      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer);
 
       // 日付文字列を生成
       const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
@@ -945,6 +997,314 @@ exports.generateReportPdfWithQR = onCall(
       console.error("PDF/QRコード生成エラー:", error);
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "PDF/QRコード生成に失敗しました: " + error.message);
+    }
+  }
+);
+
+/**
+ * 承認設定を解決（現場設定 > 企業設定のフォールバック）
+ */
+async function resolveApprovalSettings(companyId, siteId) {
+  // 企業設定を取得
+  const companyDoc = await db.collection("companies").doc(companyId).get();
+  const companyData = companyDoc.data();
+  const companySettings = companyData?.approvalSettings || { mode: "manual", autoApprovalEmails: [] };
+
+  if (!siteId) {
+    return { mode: companySettings.mode, emails: companySettings.autoApprovalEmails || [] };
+  }
+
+  // 現場設定を取得
+  const siteDoc = await db.collection("companies").doc(companyId)
+    .collection("sites").doc(siteId).get();
+  const siteSettings = siteDoc.data()?.approvalSettings;
+
+  if (!siteSettings || siteSettings.mode === "default") {
+    return { mode: companySettings.mode, emails: companySettings.autoApprovalEmails || [] };
+  }
+
+  // 現場設定がautoで、メールが空なら企業設定のメールを使用
+  const emails = (siteSettings.autoApprovalEmails?.length > 0)
+    ? siteSettings.autoApprovalEmails
+    : companySettings.autoApprovalEmails || [];
+
+  return { mode: siteSettings.mode, emails };
+}
+
+/**
+ * 自動承認用PDF生成（テンプレート形式・署名画像付き）
+ */
+function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer) {
+  return new Promise((resolve, reject) => {
+    try {
+      const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
+      const doc = new PDFDocument({ size: "A4", margin: 50 });
+      const buffers = [];
+
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
+
+      doc.registerFont("NotoSans", fontPath);
+      doc.font("NotoSans");
+
+      const LEFT = 50;
+      const RIGHT = 545;
+      const WIDTH = RIGHT - LEFT;
+
+      // 日付フォーマット
+      const reportDate = reportData.reportDate?.toDate
+        ? reportData.reportDate.toDate()
+        : new Date(reportData.reportDate);
+      const dateStr = `${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
+
+      const submittedAt = reportData.submittedAt?.toDate
+        ? reportData.submittedAt.toDate()
+        : reportData.submittedAt ? new Date(reportData.submittedAt) : new Date();
+      const reportDateStr = `${submittedAt.getMonth() + 1}月${submittedAt.getDate()}日`;
+
+      // === 報告日 ===
+      doc.fontSize(10).fillColor("#000000");
+      doc.text(`報告日：${reportDateStr}`, LEFT, 50);
+      doc.moveDown(0.5);
+
+      // === ヘッダー2行構成 ===
+      const headerTop = doc.y;
+      const row1H = 55;
+      const row2H = 22;
+      const labelW = 70;
+      const signW = 200;
+      const infoLabelW = 50;
+      const col1 = LEFT;
+      const col2 = LEFT + labelW;
+      const col3 = col2 + signW;
+      const col4 = col3 + infoLabelW;
+
+      // 上段
+      doc.rect(col1, headerTop, WIDTH, row1H).stroke();
+      doc.moveTo(col2, headerTop).lineTo(col2, headerTop + row1H).stroke();
+      doc.moveTo(col3, headerTop).lineTo(col3, headerTop + row1H).stroke();
+      doc.moveTo(col4, headerTop).lineTo(col4, headerTop + row1H).stroke();
+
+      doc.fontSize(9);
+      doc.text("元請確認欄", col1 + 4, headerTop + (row1H / 2) - 5);
+      doc.text("実施日", col3 + 4, headerTop + (row1H / 2) - 5);
+      doc.text(dateStr, col4 + 4, headerTop + (row1H / 2) - 5);
+
+      // サイン画像
+      if (signatureImageBuffer) {
+        try {
+          const sigPad = 4;
+          doc.image(signatureImageBuffer, col2 + sigPad, headerTop + sigPad, {
+            fit: [signW - sigPad * 2, row1H - sigPad * 2],
+          });
+        } catch (e) {
+          console.error("サイン画像埋め込みエラー:", e);
+        }
+      }
+
+      // 下段
+      const row2Top = headerTop + row1H;
+      doc.rect(col1, row2Top, WIDTH, row2H).stroke();
+      doc.moveTo(col3, row2Top).lineTo(col3, row2Top + row2H).stroke();
+      doc.moveTo(col4, row2Top).lineTo(col4, row2Top + row2H).stroke();
+
+      doc.text("作業日報", col1 + 4, row2Top + 6);
+      doc.text("作成者", col3 + 4, row2Top + 6);
+      doc.text(reportData.createdByName || "", col4 + 4, row2Top + 6);
+
+      // === 現場名 ===
+      const siteTop = row2Top + row2H + 10;
+      doc.fontSize(11);
+      doc.text("現場名", LEFT, siteTop, { continued: true });
+      doc.text(`     ${reportData.siteName || ""}`);
+      doc.moveDown(0.5);
+
+      // === 作業員テーブル ===
+      const tableTop = doc.y;
+      const colWidths = [100, 80, 80, 70, 165];
+      const headers = ["氏名", "開始時間", "終了時間", "昼休憩なし", "備考及び作業内容"];
+      const rowHeight = 22;
+      const totalRows = 9;
+      const workers = reportData.workers || [];
+
+      // テーブルヘッダー
+      doc.rect(LEFT, tableTop, WIDTH, rowHeight).stroke();
+      doc.fontSize(9).fillColor("#000000");
+      let x = LEFT;
+      headers.forEach((header, i) => {
+        doc.text(header, x + 3, tableTop + 6, { width: colWidths[i] - 6 });
+        if (i < headers.length - 1) {
+          doc.moveTo(x + colWidths[i], tableTop)
+            .lineTo(x + colWidths[i], tableTop + rowHeight).stroke();
+        }
+        x += colWidths[i];
+      });
+
+      // テーブル行
+      for (let row = 0; row < totalRows; row++) {
+        const y = tableTop + rowHeight * (row + 1);
+        doc.rect(LEFT, y, WIDTH, rowHeight).stroke();
+
+        x = LEFT;
+        const worker = workers[row];
+
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.moveTo(x, y).lineTo(x, y + rowHeight).stroke();
+        }
+
+        if (worker) {
+          x = LEFT;
+          doc.text(worker.name || "", x + 3, y + 6, { width: colWidths[0] - 6 });
+          x += colWidths[0];
+          doc.text(worker.startTime || "", x + 3, y + 6, { width: colWidths[1] - 6 });
+          x += colWidths[1];
+          doc.text(worker.endTime || "", x + 3, y + 6, { width: colWidths[2] - 6 });
+          x += colWidths[2];
+          const cbX = x + (colWidths[3] / 2) - 6;
+          const cbY = y + 5;
+          doc.rect(cbX, cbY, 12, 12).stroke();
+          if (worker.noLunchBreak) {
+            doc.moveTo(cbX + 2, cbY + 6).lineTo(cbX + 5, cbY + 10)
+              .lineTo(cbX + 10, cbY + 2).stroke();
+          }
+          x += colWidths[3];
+          doc.text(worker.remarks || "", x + 3, y + 6, { width: colWidths[4] - 6 });
+        } else {
+          x = LEFT + colWidths[0] + colWidths[1] + colWidths[2];
+          const cbX = x + (colWidths[3] / 2) - 6;
+          const cbY = y + 5;
+          doc.rect(cbX, cbY, 12, 12).stroke();
+        }
+      }
+
+      // === 連絡事項 ===
+      const notesTop = tableTop + rowHeight * (totalRows + 1) + 15;
+      const notesHeight = 100;
+      doc.rect(LEFT, notesTop, WIDTH, notesHeight).stroke();
+      doc.fontSize(9).text("連絡事項", LEFT + 5, notesTop + 5);
+      if (reportData.notes) {
+        doc.fontSize(9).text(reportData.notes, LEFT + 10, notesTop + 22, {
+          width: WIDTH - 20,
+          height: notesHeight - 30,
+        });
+      }
+
+      // === フッター ===
+      doc.fontSize(10).text(
+        companyData?.companyName || "",
+        LEFT,
+        notesTop + notesHeight + 15
+      );
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+/**
+ * 日報自動承認処理（ステータスがsubmittedに変更された時）
+ */
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
+
+exports.onAutoApproveReport = onDocumentUpdated(
+  {
+    document: "companies/{companyId}/dailyReports/{reportId}",
+    region: "asia-northeast1",
+    secrets: [sendgridApiKey],
+  },
+  async (event) => {
+    const beforeData = event.data.before.data();
+    const afterData = event.data.after.data();
+
+    // ステータスが変更されていない場合はスキップ
+    if (beforeData.status === afterData.status) {
+      return;
+    }
+
+    const companyId = event.params.companyId;
+    const reportId = event.params.reportId;
+
+    // === Case 1: submitted → 自動承認モードならapprovedに変更 ===
+    if (afterData.status === "submitted") {
+      try {
+        const approvalConfig = await resolveApprovalSettings(companyId, afterData.siteId);
+
+        if (approvalConfig.mode !== "auto") {
+          console.log(`手動承認モード: ${companyId}/${reportId}`);
+          return;
+        }
+
+        console.log(`自動承認開始: ${companyId}/${reportId}`);
+
+        const reportRef = db.collection("companies").doc(companyId)
+          .collection("dailyReports").doc(reportId);
+        await reportRef.update({
+          status: "approved",
+          "approval.approvedBy": "system",
+          "approval.approvedByName": "自動承認",
+          "approval.approvedAt": Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+
+        console.log(`自動承認完了: ${companyId}/${reportId}`);
+        // メール送信はCase 2（approved検知時）で行う
+      } catch (error) {
+        console.error("自動承認エラー:", error);
+      }
+      return;
+    }
+
+    // === Case 2: approved → PDF生成 + メール送信（自動・手動共通） ===
+    if (afterData.status === "approved") {
+      try {
+        console.log(`承認メール送信開始: ${companyId}/${reportId}`);
+
+        // 承認設定からメール送信先を取得
+        const approvalConfig = await resolveApprovalSettings(companyId, afterData.siteId);
+        const emails = approvalConfig.emails.filter(e => e && e.trim());
+
+        if (emails.length === 0) {
+          console.log(`メール送信先なし: ${companyId}/${reportId}`);
+          return;
+        }
+
+        // サイン画像ダウンロード + PDF生成
+        const companyDoc = await db.collection("companies").doc(companyId).get();
+        const companyData = companyDoc.data();
+        const signatureImageBuffer = await downloadSignatureImage(afterData.clientSignature?.imageUrl);
+        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer);
+
+        // SendGrid APIでメール送信
+        const reportDate = afterData.reportDate?.toDate
+          ? afterData.reportDate.toDate()
+          : new Date(afterData.reportDate);
+        const dateStr = `${reportDate.getFullYear()}年${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
+
+        const isAutoApproved = afterData.approval?.approvedBy === "system";
+        const approvalType = isAutoApproved ? "自動承認" : "承認";
+
+        sgMail.setApiKey(sendgridApiKey.value());
+        await sgMail.send({
+          to: emails,
+          from: "labor-management-info@improve-biz.com",
+          subject: `【日報】${afterData.siteName || ""} - ${dateStr}`,
+          text: `${companyData?.companyName || ""}の日報が${approvalType}されました。\n\n現場: ${afterData.siteName || ""}\n実施日: ${dateStr}\n作成者: ${afterData.createdByName || ""}\n\nPDFを添付しています。`,
+          attachments: [{
+            filename: `日報_${afterData.siteName || ""}_${dateStr}.pdf`,
+            content: pdfBuffer.toString("base64"),
+            type: "application/pdf",
+            disposition: "attachment",
+          }],
+        });
+
+        console.log(`承認メール送信完了: ${emails.join(", ")} (${approvalType})`);
+      } catch (error) {
+        console.error("承認メール送信エラー:", error);
+      }
     }
   }
 );
