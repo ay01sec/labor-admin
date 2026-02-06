@@ -883,19 +883,22 @@ exports.generateReportPdfWithQR = onCall(
       const dateStr = formatDateForFilename(reportDate);
       const siteName = (report.siteName || "不明").replace(/[/\\?%*:|"<>]/g, "_");
 
-      // PDFをStorageにアップロード
+      // PDFをStorageにアップロード（ダウンロードトークン付き）
       const pdfPath = `companies/${companyId}/reports/${reportId}/report_${dateStr}.pdf`;
       const pdfFile = bucket.file(pdfPath);
+      const pdfToken = require("crypto").randomUUID();
       await pdfFile.save(pdfBuffer, {
         contentType: "application/pdf",
         metadata: {
           cacheControl: "public, max-age=31536000",
+          metadata: {
+            firebaseStorageDownloadTokens: pdfToken,
+          },
         },
       });
 
-      // ファイルを公開
-      await pdfFile.makePublic();
-      const pdfUrl = `https://storage.googleapis.com/${bucket.name}/${pdfPath}`;
+      // Firebase Storage形式のダウンロードURL
+      const pdfUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(pdfPath)}?alt=media&token=${pdfToken}`;
 
       // QRコード生成（PDFのURLを含む）
       const qrDataUrl = await QRCode.toDataURL(pdfUrl, {
@@ -907,20 +910,23 @@ exports.generateReportPdfWithQR = onCall(
         },
       });
 
-      // QRコードをStorageにアップロード
+      // QRコードをStorageにアップロード（ダウンロードトークン付き）
       const qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");
       const qrPath = `companies/${companyId}/reports/${reportId}/qrcode.png`;
       const qrFile = bucket.file(qrPath);
+      const qrToken = require("crypto").randomUUID();
       await qrFile.save(qrBuffer, {
         contentType: "image/png",
         metadata: {
           cacheControl: "public, max-age=31536000",
+          metadata: {
+            firebaseStorageDownloadTokens: qrToken,
+          },
         },
       });
 
-      // QRコードファイルを公開
-      await qrFile.makePublic();
-      const qrUrl = `https://storage.googleapis.com/${bucket.name}/${qrPath}`;
+      // Firebase Storage形式のダウンロードURL
+      const qrUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(qrPath)}?alt=media&token=${qrToken}`;
 
       // Firestoreに保存
       await reportRef.update({
