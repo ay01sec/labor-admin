@@ -884,7 +884,7 @@ exports.generateReportPdfWithQR = onCall(
       const siteName = (report.siteName || "不明").replace(/[/\\?%*:|"<>]/g, "_");
 
       // PDFをStorageにアップロード
-      const pdfPath = `companies/${companyId}/reports/${reportId}/日報_${dateStr}_${siteName}.pdf`;
+      const pdfPath = `companies/${companyId}/reports/${reportId}/report_${dateStr}.pdf`;
       const pdfFile = bucket.file(pdfPath);
       await pdfFile.save(pdfBuffer, {
         contentType: "application/pdf",
@@ -893,11 +893,9 @@ exports.generateReportPdfWithQR = onCall(
         },
       });
 
-      // 署名付きURL取得（1年間有効）
-      const [pdfUrl] = await pdfFile.getSignedUrl({
-        action: "read",
-        expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      });
+      // ファイルを公開
+      await pdfFile.makePublic();
+      const pdfUrl = `https://storage.googleapis.com/${bucket.name}/${pdfPath}`;
 
       // QRコード生成（PDFのURLを含む）
       const qrDataUrl = await QRCode.toDataURL(pdfUrl, {
@@ -920,11 +918,9 @@ exports.generateReportPdfWithQR = onCall(
         },
       });
 
-      // QRコードの署名付きURL取得
-      const [qrUrl] = await qrFile.getSignedUrl({
-        action: "read",
-        expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      });
+      // QRコードファイルを公開
+      await qrFile.makePublic();
+      const qrUrl = `https://storage.googleapis.com/${bucket.name}/${qrPath}`;
 
       // Firestoreに保存
       await reportRef.update({
