@@ -54,7 +54,7 @@ const PlaceholderPage = ({ title }) => (
 
 // 認証が必要なルート
 function PrivateRoute({ children, skipMfaCheck = false }) {
-  const { currentUser, loading, requiresMfaSetup } = useAuth();
+  const { currentUser, loading, requiresMfaSetup, requires2FA, loginInProgress } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -65,7 +65,8 @@ function PrivateRoute({ children, skipMfaCheck = false }) {
     );
   }
 
-  if (!currentUser) {
+  // ログイン処理中または2FA待ちの場合はログインページへ
+  if (!currentUser || loginInProgress || requires2FA) {
     return <Navigate to="/login" />;
   }
 
@@ -93,13 +94,13 @@ function AdminRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { currentUser, requires2FA } = useAuth();
+  const { currentUser, requires2FA, loginInProgress } = useAuth();
 
   // デバッグ
-  console.log('AppRoutes - currentUser:', !!currentUser, 'requires2FA:', requires2FA);
+  console.log('AppRoutes - currentUser:', !!currentUser, 'requires2FA:', requires2FA, 'loginInProgress:', loginInProgress);
 
-  // 2FA待ちの場合はログイン未完了として扱う
-  const isFullyLoggedIn = currentUser && !requires2FA;
+  // 2FA待ち or ログイン処理中の場合はログイン未完了として扱う
+  const isFullyLoggedIn = currentUser && !requires2FA && !loginInProgress;
   console.log('AppRoutes - isFullyLoggedIn:', isFullyLoggedIn);
 
   return (
