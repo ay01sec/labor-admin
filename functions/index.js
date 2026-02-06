@@ -56,8 +56,9 @@ async function sendWelcomeEmail({ to, companyCode, displayName, adminUrl }) {
   const smtpPort = process.env.SMTP_PORT;
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM;
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
+  if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
     console.warn("SMTP設定が未設定のためメール送信をスキップしました");
     return false;
   }
@@ -117,7 +118,7 @@ ${displayName} 様
 `.trim();
 
   await transporter.sendMail({
-    from: `"労務管理システム" <${smtpUser}>`,
+    from: `"労務管理システム" <${smtpFrom}>`,
     to,
     subject: "【労務管理システム】利用開始のご案内",
     text: mailBody,
@@ -344,8 +345,9 @@ exports.send2FACode = onCall(
       const smtpPort = process.env.SMTP_PORT;
       const smtpUser = process.env.SMTP_USER;
       const smtpPass = process.env.SMTP_PASS;
+      const smtpFrom = process.env.SMTP_FROM;
 
-      if (!smtpHost || !smtpUser || !smtpPass) {
+      if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
         console.warn("SMTP設定が未設定のためメール送信をスキップ");
         // 開発用: SMTPが未設定の場合はコードをレスポンスに含める
         return { success: true, devCode: code };
@@ -375,7 +377,7 @@ ${userData.displayName} 様
 `.trim();
 
       await transporter.sendMail({
-        from: `"労務管理システム" <${smtpUser}>`,
+        from: `"労務管理システム" <${smtpFrom}>`,
         to: userData.email,
         subject: "【労務管理システム】認証コード",
         text: mailBody,
