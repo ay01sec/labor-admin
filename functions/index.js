@@ -1258,32 +1258,95 @@ exports.onAutoApproveReport = onDocumentUpdated(
       return;
     }
 
-    // === Case 2: approved → PDF生成 + メール送信（自動・手動共通） ===
+    // === Case 2: approved → PDF/QR生成 + Storage保存 + メール送信（自動・手動共通） ===
     if (afterData.status === "approved") {
       try {
-        console.log(`承認メール送信開始: ${companyId}/${reportId}`);
+        console.log(`承認処理開始: ${companyId}/${reportId}`);
+
+        // 会社情報を取得
+        const companyDoc = await db.collection("companies").doc(companyId).get();
+        const companyData = companyDoc.data();
+
+        // サイン画像ダウンロード + PDF生成
+        const signatureImageBuffer = await downloadSignatureImage(afterData.clientSignature?.imageUrl);
+        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer);
+
+        // 日付文字列を生成
+        const reportDate = afterData.reportDate?.toDate
+          ? afterData.reportDate.toDate()
+          : new Date(afterData.reportDate);
+        const dateStr = `${reportDate.getFullYear()}年${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
+        const dateStrForFile = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, "0")}${String(reportDate.getDate()).padStart(2, "0")}`;
+
+        // PDFをStorageにアップロード（ダウンロードトークン付き）
+        const crypto = require("crypto");
+        const pdfPath = `companies/${companyId}/reports/${reportId}/report_${dateStrForFile}.pdf`;
+        const pdfFile = bucket.file(pdfPath);
+        const pdfToken = crypto.randomUUID();
+        await pdfFile.save(pdfBuffer, {
+          contentType: "application/pdf",
+          metadata: {
+            cacheControl: "public, max-age=31536000",
+            metadata: {
+              firebaseStorageDownloadTokens: pdfToken,
+            },
+          },
+        });
+
+        // Firebase Storage形式のダウンロードURL
+        const pdfUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(pdfPath)}?alt=media&token=${pdfToken}`;
+        console.log(`PDF保存完了: ${pdfUrl}`);
+
+        // QRコード生成（PDFのURLを含む）
+        const qrDataUrl = await QRCode.toDataURL(pdfUrl, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: "#000000",
+            light: "#ffffff",
+          },
+        });
+
+        // QRコードをStorageにアップロード（ダウンロードトークン付き）
+        const qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");
+        const qrPath = `companies/${companyId}/reports/${reportId}/qrcode.png`;
+        const qrFile = bucket.file(qrPath);
+        const qrToken = crypto.randomUUID();
+        await qrFile.save(qrBuffer, {
+          contentType: "image/png",
+          metadata: {
+            cacheControl: "public, max-age=31536000",
+            metadata: {
+              firebaseStorageDownloadTokens: qrToken,
+            },
+          },
+        });
+
+        // Firebase Storage形式のダウンロードURL
+        const qrUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(qrPath)}?alt=media&token=${qrToken}`;
+        console.log(`QRコード保存完了: ${qrUrl}`);
+
+        // Firestoreに保存
+        const reportRef = db.collection("companies").doc(companyId)
+          .collection("dailyReports").doc(reportId);
+        await reportRef.update({
+          pdfUrl: pdfUrl,
+          qrCodeUrl: qrUrl,
+          pdfGeneratedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        console.log(`Firestore更新完了: pdfUrl, qrCodeUrl`);
 
         // 承認設定からメール送信先を取得
         const approvalConfig = await resolveApprovalSettings(companyId, afterData.siteId);
         const emails = approvalConfig.emails.filter(e => e && e.trim());
 
         if (emails.length === 0) {
-          console.log(`メール送信先なし: ${companyId}/${reportId}`);
+          console.log(`メール送信先なし（PDF/QR生成は完了）: ${companyId}/${reportId}`);
           return;
         }
 
-        // サイン画像ダウンロード + PDF生成
-        const companyDoc = await db.collection("companies").doc(companyId).get();
-        const companyData = companyDoc.data();
-        const signatureImageBuffer = await downloadSignatureImage(afterData.clientSignature?.imageUrl);
-        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer);
-
         // SendGrid APIでメール送信
-        const reportDate = afterData.reportDate?.toDate
-          ? afterData.reportDate.toDate()
-          : new Date(afterData.reportDate);
-        const dateStr = `${reportDate.getFullYear()}年${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
-
         const isAutoApproved = afterData.approval?.approvedBy === "system";
         const approvalType = isAutoApproved ? "自動承認" : "承認";
 
@@ -1303,7 +1366,7 @@ exports.onAutoApproveReport = onDocumentUpdated(
 
         console.log(`承認メール送信完了: ${emails.join(", ")} (${approvalType})`);
       } catch (error) {
-        console.error("承認メール送信エラー:", error);
+        console.error("承認処理エラー:", error);
       }
     }
   }
