@@ -95,8 +95,12 @@ function AdminRoute({ children }) {
 function AppRoutes() {
   const { currentUser, requires2FA } = useAuth();
 
+  // デバッグ
+  console.log('AppRoutes - currentUser:', !!currentUser, 'requires2FA:', requires2FA);
+
   // 2FA待ちの場合はログイン未完了として扱う
   const isFullyLoggedIn = currentUser && !requires2FA;
+  console.log('AppRoutes - isFullyLoggedIn:', isFullyLoggedIn);
 
   return (
     <Routes>
