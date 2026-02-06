@@ -38,25 +38,25 @@ export default function Login() {
     pending2FAUser,
     send2FACode,
     verify2FACode,
-    cancel2FA
+    cancel2FA,
+    twoFACodeSent,
+    twoFADevCode
   } = useAuth();
   const navigate = useNavigate();
 
-  // カスタム2FA関連の状態
-  const [custom2FAStep, setCustom2FAStep] = useState(null); // null | 'code'
+  // カスタム2FA関連の状態（コード入力値のみローカル）
   const [custom2FACode, setCustom2FACode] = useState('');
   const [sending2FACode, setSending2FACode] = useState(false);
-  const [devCode, setDevCode] = useState(null); // 開発用
 
-  // デバッグ: custom2FAStepの変化を監視
+  // デバッグ: twoFACodeSentの変化を監視
   useEffect(() => {
-    console.log('custom2FAStep changed to:', custom2FAStep);
-  }, [custom2FAStep]);
+    console.log('twoFACodeSent changed to:', twoFACodeSent);
+  }, [twoFACodeSent]);
 
-  // デバッグ: devCodeの変化を監視
+  // デバッグ: twoFADevCodeの変化を監視
   useEffect(() => {
-    console.log('devCode changed to:', devCode);
-  }, [devCode]);
+    console.log('twoFADevCode changed to:', twoFADevCode);
+  }, [twoFADevCode]);
 
   // reCAPTCHA初期化
   useEffect(() => {
@@ -215,14 +215,7 @@ export default function Login() {
       console.log('Calling send2FACode...');
       const result = await send2FACode(companyIdOverride);
       console.log('send2FACode result:', result);
-      console.log('Setting custom2FAStep to code...');
-      setCustom2FAStep('code');
-      console.log('custom2FAStep set to code');
-      // 開発用: SMTPが未設定の場合はコードを表示
-      if (result.devCode) {
-        console.log('Setting devCode:', result.devCode);
-        setDevCode(result.devCode);
-      }
+      // context内で twoFACodeSent と twoFADevCode が設定される
       console.log('handleSendCustom2FACode completed successfully');
     } catch (err) {
       console.error('2FAコード送信エラー:', err);
@@ -259,14 +252,13 @@ export default function Login() {
   // カスタム2FA: キャンセル
   const handleCancelCustom2FA = async () => {
     await cancel2FA();
-    setCustom2FAStep(null);
+    // context内で twoFACodeSent と twoFADevCode がリセットされる
     setCustom2FACode('');
-    setDevCode(null);
     setError('');
   };
 
   // カスタム2FA認証コード入力画面
-  if (custom2FAStep === 'code') {
+  if (twoFACodeSent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
@@ -289,10 +281,10 @@ export default function Login() {
           )}
 
           {/* 開発用: SMTP未設定時のコード表示 */}
-          {devCode && (
+          {twoFADevCode && (
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6">
               <p className="text-xs font-medium">開発用（SMTP未設定）</p>
-              <p className="text-2xl font-mono font-bold tracking-widest">{devCode}</p>
+              <p className="text-2xl font-mono font-bold tracking-widest">{twoFADevCode}</p>
             </div>
           )}
 

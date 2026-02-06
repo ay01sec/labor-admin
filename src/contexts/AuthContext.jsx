@@ -49,6 +49,8 @@ export function AuthProvider({ children }) {
   const [pending2FACompany, setPending2FACompany] = useState(null);
   const [twoFAVerified, setTwoFAVerified] = useState(false);
   const is2FAPendingRef = useRef(false); // refでも追跡
+  const [twoFACodeSent, setTwoFACodeSent] = useState(false); // コード送信済み
+  const [twoFADevCode, setTwoFADevCode] = useState(null); // 開発用コード
 
   // 企業コードで企業を検索（未認証でも可能）
   async function findCompanyByCode(companyCode) {
@@ -295,6 +297,13 @@ export function AuthProvider({ children }) {
     }
     const send2FACodeFn = httpsCallable(functions, 'send2FACode');
     const result = await send2FACodeFn({ companyId });
+
+    // コンテキストに状態を保存
+    setTwoFACodeSent(true);
+    if (result.data.devCode) {
+      setTwoFADevCode(result.data.devCode);
+    }
+
     return result.data;
   }
 
@@ -332,6 +341,8 @@ export function AuthProvider({ children }) {
     setPending2FAUser(null);
     setPending2FACompany(null);
     setRequires2FA(false);
+    setTwoFACodeSent(false);
+    setTwoFADevCode(null);
     await signOut(auth);
   }
 
@@ -470,7 +481,9 @@ export function AuthProvider({ children }) {
     pending2FAUser,
     send2FACode,
     verify2FACode,
-    cancel2FA
+    cancel2FA,
+    twoFACodeSent,
+    twoFADevCode
   };
 
   return (
