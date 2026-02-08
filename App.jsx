@@ -57,9 +57,10 @@ function PrivateRoute({ children }) {
 
 // 事務員以上（管理者・事務員）がアクセス可能なルート
 function OfficeRoute({ children }) {
-  const { isOfficeOrAbove, loading } = useAuth();
+  const { isOfficeOrAbove, loading, userInfo } = useAuth();
 
-  if (loading) {
+  // loading中またはuserInfoがまだ設定されていない場合はローディング表示
+  if (loading || !userInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

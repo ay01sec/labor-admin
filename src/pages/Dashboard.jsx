@@ -7,8 +7,6 @@ import {
   query,
   where,
   getDocs,
-  orderBy,
-  limit,
   Timestamp
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -183,19 +181,22 @@ export default function Dashboard() {
           total: activeSitesInPeriod.length,
         });
 
-        // 最近の日報取得
+        // 最近の日報取得（インデックス問題回避のためクライアント側でソート）
         const recentReportsSnap = await getDocs(
-          query(
-            collection(db, 'companies', companyId, 'dailyReports'),
-            orderBy('createdAt', 'desc'),
-            limit(5)
-          )
+          collection(db, 'companies', companyId, 'dailyReports')
         );
 
-        const reports = recentReportsSnap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const reports = recentReportsSnap.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .sort((a, b) => {
+            const dateA = a.reportDate?.toDate ? a.reportDate.toDate() : new Date(a.reportDate || 0);
+            const dateB = b.reportDate?.toDate ? b.reportDate.toDate() : new Date(b.reportDate || 0);
+            return dateB - dateA; // 降順
+          })
+          .slice(0, 5);
         setRecentReports(reports);
 
         // お知らせ（仮のデータ）
@@ -361,7 +362,7 @@ export default function Dashboard() {
                   {recentReports.map((report) => (
                     <tr key={report.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {report.workDate?.toDate?.()?.toLocaleDateString('ja-JP') || '-'}
+                        {report.reportDate?.toDate?.()?.toLocaleDateString('ja-JP') || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {report.siteName || '-'}
@@ -399,7 +400,7 @@ export default function Dashboard() {
                     <StatusBadge status={report.status} />
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {report.createdByName || '-'} - {report.workDate?.toDate?.()?.toLocaleDateString('ja-JP') || '-'}
+                    {report.createdByName || '-'} - {report.reportDate?.toDate?.()?.toLocaleDateString('ja-JP') || '-'}
                   </div>
                 </Link>
               ))}
