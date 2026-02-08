@@ -59,8 +59,11 @@ function PrivateRoute({ children }) {
 function OfficeRoute({ children }) {
   const { isOfficeOrAbove, loading, userInfo } = useAuth();
 
+  console.log('OfficeRoute - loading:', loading, 'userInfo:', userInfo, 'role:', userInfo?.role, 'isOfficeOrAbove:', isOfficeOrAbove?.());
+
   // loading中またはuserInfoがまだ設定されていない場合はローディング表示
   if (loading || !userInfo) {
+    console.log('OfficeRoute - showing loading spinner');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -68,7 +71,9 @@ function OfficeRoute({ children }) {
     );
   }
 
-  return isOfficeOrAbove() ? children : <Navigate to="/" />;
+  const hasAccess = isOfficeOrAbove();
+  console.log('OfficeRoute - hasAccess:', hasAccess);
+  return hasAccess ? children : <Navigate to="/" />;
 }
 
 function AppRoutes() {
