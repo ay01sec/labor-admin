@@ -11,11 +11,20 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // 日報の写真・署名フォルダ
+    // 日報の写真フォルダ
     match /reports/{companyId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null
         && request.resource.size < 5 * 1024 * 1024;  // 5MB以下
+      allow delete: if request.auth != null;
+    }
+
+    // 署名フォルダ
+    match /signatures/{companyId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 2 * 1024 * 1024  // 2MB以下
+        && request.resource.contentType.matches('image/.*');  // 画像のみ
       allow delete: if request.auth != null;
     }
 
