@@ -14,8 +14,8 @@
 
 | プロジェクト | 説明 | Hosting URL |
 |-------------|------|-------------|
-| `labor-admin` | 管理システム（Web） | https://labor-admin-20260202.web.app |
-| `daily-report-app` | 日報アプリ（PWA） | https://daily-report-20260202.web.app |
+| `labor-admin` | 管理システム（Web） | https://construction-manage.improve-biz.com |
+| `daily-report-app` | 日報アプリ（PWA） | https://construction-report.improve-biz.com |
 | `functions` | Cloud Functions | asia-northeast1 |
 
 ---

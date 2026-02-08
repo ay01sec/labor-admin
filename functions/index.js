@@ -82,7 +82,7 @@ async function sendWelcomeEmail({ to, companyCode, displayName, adminUrl }) {
     },
   });
 
-  const loginUrl = `${adminUrl || "https://labor-admin-20260202.web.app"}/login`;
+  const loginUrl = `${adminUrl || "https://construction-manage.improve-biz.com"}/login`;
 
   const mailBody = `
 ${displayName} 様
@@ -562,7 +562,7 @@ exports.registerCompany = onCall(
       });
 
       // 5. ウェルカムメール送信
-      const adminUrl = process.env.ADMIN_URL || "https://labor-admin-20260202.web.app";
+      const adminUrl = process.env.ADMIN_URL || "https://construction-manage.improve-biz.com";
       await sendWelcomeEmail({
         to: user.email.trim(),
         companyCode,

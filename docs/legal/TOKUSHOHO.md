@@ -33,7 +33,7 @@ CONSTRUCTION DX SYSTEM
 
 ## サービスURL
 
-https://labor-admin-20260202.web.app/
+https://construction-manage.improve-biz.com/
 
 ---
 
