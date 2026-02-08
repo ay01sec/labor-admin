@@ -67,7 +67,7 @@ const menuItems = [
     label: '勤怠集計',
     category: '集計',
     adminOnly: false,
-    hidden: true // 公開時にfalseに変更
+    hidden: false
   },
   { 
     id: 'contracts', 
