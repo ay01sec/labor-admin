@@ -644,7 +644,15 @@ exports.generateBulkPdf = onCall(
       // 各日報のPDFを生成
       for (const report of reports) {
         const signatureImageBuffer = await downloadSignatureImage(report.clientSignature?.imageUrl);
-        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer);
+        // 現場データから元請会社名を取得
+        let clientName = null;
+        if (report.siteId) {
+          const siteDoc = await db.collection("companies").doc(companyId).collection("sites").doc(report.siteId).get();
+          if (siteDoc.exists) {
+            clientName = siteDoc.data().clientName || null;
+          }
+        }
+        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName);
         const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
         const dateStr = formatDateForFilename(reportDate);
         const siteName = (report.siteName || "不明").replace(/[/\\?%*:|"<>]/g, "_");
@@ -688,7 +696,7 @@ async function downloadSignatureImage(imageUrl) {
 /**
  * 日報PDFを生成（テンプレート形式）
  */
-function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer) {
+function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -793,10 +801,19 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
       doc.text("作成者", col3 + 4, row2Top + 6);
       doc.text(report.createdByName || "", col4 + 4, row2Top + 6);
 
-      // === 現場名 ===
-      const siteTop = row2Top + row2H + 10;
+      // === 元請会社名・現場名 ===
+      let infoTop = row2Top + row2H + 10;
       doc.fontSize(11);
-      doc.text("現場名", LEFT, siteTop, { continued: true });
+
+      // 元請会社名
+      if (clientName) {
+        doc.text("元請会社名", LEFT, infoTop, { continued: true });
+        doc.text(`  ${clientName}`);
+        infoTop = doc.y + 5;
+      }
+
+      // 現場名
+      doc.text("現場名", LEFT, infoTop, { continued: true });
       doc.text(`     ${report.siteName || ""}`);
       doc.moveDown(0.5);
 
@@ -878,13 +895,6 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
         });
       }
 
-      // === フッター（企業名）===
-      doc.fontSize(10).text(
-        companyData?.companyName || "",
-        LEFT,
-        notesTop + notesHeight + 15
-      );
-
       doc.end();
     } catch (error) {
       reject(error);
@@ -960,8 +970,17 @@ exports.generateReportPdfWithQR = onCall(
       // ロゴ画像をダウンロード
       const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
 
+      // 現場データから元請会社名を取得
+      let clientName = null;
+      if (report.siteId) {
+        const siteDoc = await db.collection("companies").doc(companyId).collection("sites").doc(report.siteId).get();
+        if (siteDoc.exists) {
+          clientName = siteDoc.data().clientName || null;
+        }
+      }
+
       // PDF生成
-      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer);
+      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName);
 
       // 日付文字列を生成
       const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
@@ -1067,7 +1086,7 @@ async function resolveApprovalSettings(companyId, siteId) {
 /**
  * 自動承認用PDF生成（テンプレート形式・署名画像付き）
  */
-function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer, logoImageBuffer) {
+function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer, logoImageBuffer, clientName) {
   return new Promise((resolve, reject) => {
     try {
       const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
@@ -1173,10 +1192,19 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
       doc.text("作成者", col3 + 4, row2Top + 6);
       doc.text(reportData.createdByName || "", col4 + 4, row2Top + 6);
 
-      // === 現場名 ===
-      const siteTop = row2Top + row2H + 10;
+      // === 元請会社名・現場名 ===
+      let infoTop = row2Top + row2H + 10;
       doc.fontSize(11);
-      doc.text("現場名", LEFT, siteTop, { continued: true });
+
+      // 元請会社名
+      if (clientName) {
+        doc.text("元請会社名", LEFT, infoTop, { continued: true });
+        doc.text(`  ${clientName}`);
+        infoTop = doc.y + 5;
+      }
+
+      // 現場名
+      doc.text("現場名", LEFT, infoTop, { continued: true });
       doc.text(`     ${reportData.siteName || ""}`);
       doc.moveDown(0.5);
 
@@ -1251,13 +1279,6 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
         });
       }
 
-      // === フッター ===
-      doc.fontSize(10).text(
-        companyData?.companyName || "",
-        LEFT,
-        notesTop + notesHeight + 15
-      );
-
       doc.end();
     } catch (error) {
       reject(error);
@@ -1327,10 +1348,21 @@ exports.onAutoApproveReport = onDocumentUpdated(
         const companyDoc = await db.collection("companies").doc(companyId).get();
         const companyData = companyDoc.data();
 
-        // サイン画像・ロゴ画像ダウンロード + PDF生成
+        // サイン画像・ロゴ画像ダウンロード
         const signatureImageBuffer = await downloadSignatureImage(afterData.clientSignature?.imageUrl);
         const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
-        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer, logoImageBuffer);
+
+        // 現場データから元請会社名を取得
+        let clientName = null;
+        if (afterData.siteId) {
+          const siteDoc = await db.collection("companies").doc(companyId).collection("sites").doc(afterData.siteId).get();
+          if (siteDoc.exists) {
+            clientName = siteDoc.data().clientName || null;
+          }
+        }
+
+        // PDF生成
+        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer, logoImageBuffer, clientName);
 
         // 日付文字列を生成
         const reportDate = afterData.reportDate?.toDate
