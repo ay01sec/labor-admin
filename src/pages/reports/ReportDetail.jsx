@@ -7,7 +7,9 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../services/firebase';
 import {
   ArrowLeft,
@@ -21,6 +23,11 @@ import {
   AlertCircle,
   QrCode,
   ExternalLink,
+  Edit,
+  Plus,
+  Trash2,
+  Save,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -48,7 +55,7 @@ function StatusBadge({ status }) {
 export default function ReportDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { companyId, currentUser, userInfo } = useAuth();
+  const { companyId, currentUser, userInfo, isOfficeOrAbove } = useAuth();
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +63,11 @@ export default function ReportDetail() {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+
+  // 編集機能用
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // データ取得
   useEffect(() => {
@@ -196,6 +208,113 @@ export default function ReportDetail() {
   }
 
   const canApprove = report.status === 'submitted';
+  const canEdit = isOfficeOrAbove && isOfficeOrAbove() && ['approved', 'submitted'].includes(report.status);
+
+  // 編集モーダルを開く
+  const openEditModal = () => {
+    const reportDate = report.reportDate?.toDate
+      ? report.reportDate.toDate()
+      : new Date(report.reportDate);
+
+    setEditData({
+      reportDate: format(reportDate, 'yyyy-MM-dd'),
+      weather: report.weather || '',
+      workers: report.workers?.map(w => ({ ...w })) || [],
+      notes: report.notes || '',
+    });
+    setShowEditModal(true);
+  };
+
+  // 作業員の追加
+  const addWorker = () => {
+    setEditData(prev => ({
+      ...prev,
+      workers: [
+        ...prev.workers,
+        { name: '', startTime: '08:00', endTime: '17:00', noLunchBreak: false, remarks: '' }
+      ]
+    }));
+  };
+
+  // 作業員の削除
+  const removeWorker = (index) => {
+    setEditData(prev => ({
+      ...prev,
+      workers: prev.workers.filter((_, i) => i !== index)
+    }));
+  };
+
+  // 作業員情報の更新
+  const updateWorker = (index, field, value) => {
+    setEditData(prev => ({
+      ...prev,
+      workers: prev.workers.map((w, i) =>
+        i === index ? { ...w, [field]: value } : w
+      )
+    }));
+  };
+
+  // 保存してPDF再生成
+  const handleSaveAndRegenerate = async () => {
+    if (!editData.workers.length) {
+      toast.error('作業員を1名以上登録してください');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1. Firestoreを更新
+      const reportRef = doc(db, 'companies', companyId, 'dailyReports', id);
+      await updateDoc(reportRef, {
+        reportDate: Timestamp.fromDate(new Date(editData.reportDate)),
+        weather: editData.weather,
+        workers: editData.workers,
+        notes: editData.notes,
+        updatedAt: serverTimestamp(),
+        lastEditedBy: currentUser.uid,
+        lastEditedByName: userInfo?.displayName || userInfo?.email || '',
+        lastEditedAt: serverTimestamp(),
+      });
+
+      // 2. PDF再生成（承認済みの場合のみ）
+      if (report.status === 'approved') {
+        const functions = getFunctions(undefined, 'asia-northeast1');
+        const regeneratePdf = httpsCallable(functions, 'generateReportPdfWithQR');
+        const result = await regeneratePdf({ companyId, reportId: id });
+
+        // ローカルstate更新（PDF URL含む）
+        setReport(prev => ({
+          ...prev,
+          reportDate: Timestamp.fromDate(new Date(editData.reportDate)),
+          weather: editData.weather,
+          workers: editData.workers,
+          notes: editData.notes,
+          pdfUrl: result.data.pdfUrl,
+          qrCodeUrl: result.data.qrCodeUrl,
+        }));
+
+        toast.success('日報を更新し、PDFを再生成しました');
+      } else {
+        // 送信完了の場合はPDF再生成なし
+        setReport(prev => ({
+          ...prev,
+          reportDate: Timestamp.fromDate(new Date(editData.reportDate)),
+          weather: editData.weather,
+          workers: editData.workers,
+          notes: editData.notes,
+        }));
+
+        toast.success('日報を更新しました');
+      }
+
+      setShowEditModal(false);
+    } catch (error) {
+      console.error('保存エラー:', error);
+      toast.error('保存に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -213,7 +332,18 @@ export default function ReportDetail() {
             <span>日報詳細</span>
           </h1>
         </div>
-        <StatusBadge status={report.status} />
+        <div className="flex items-center space-x-3">
+          {canEdit && (
+            <button
+              onClick={openEditModal}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
+            >
+              <Edit size={18} />
+              <span>編集</span>
+            </button>
+          )}
+          <StatusBadge status={report.status} />
+        </div>
       </div>
 
       {/* 承認/差戻しボタン */}
@@ -543,6 +673,206 @@ export default function ReportDetail() {
                   <ExternalLink size={16} />
                   <span>PDFを開く</span>
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 編集モーダル */}
+      {showEditModal && editData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-2xl shadow-xl my-8">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+                  <Edit size={20} className="text-orange-600" />
+                  <span>日報の編集</span>
+                </h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  disabled={saving}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={24} />
+                </button>
+              </div>
+
+              {/* 基本情報 */}
+              <div className="space-y-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      実施日
+                    </label>
+                    <input
+                      type="date"
+                      value={editData.reportDate}
+                      onChange={(e) => setEditData(prev => ({ ...prev, reportDate: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      天候
+                    </label>
+                    <select
+                      value={editData.weather}
+                      onChange={(e) => setEditData(prev => ({ ...prev, weather: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="sunny">晴れ</option>
+                      <option value="cloudy">曇り</option>
+                      <option value="rainy">雨</option>
+                      <option value="snowy">雪</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* 作業員情報 */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    作業員情報
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addWorker}
+                    className="text-sm text-orange-600 hover:text-orange-700 flex items-center space-x-1"
+                  >
+                    <Plus size={16} />
+                    <span>作業員を追加</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {editData.workers.map((worker, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-600">作業員 {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeWorker(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">氏名</label>
+                          <input
+                            type="text"
+                            value={worker.name || ''}
+                            onChange={(e) => updateWorker(index, 'name', e.target.value)}
+                            placeholder="氏名"
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">開始</label>
+                            <input
+                              type="time"
+                              value={worker.startTime || ''}
+                              onChange={(e) => updateWorker(index, 'startTime', e.target.value)}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">終了</label>
+                            <input
+                              type="time"
+                              value={worker.endTime || ''}
+                              onChange={(e) => updateWorker(index, 'endTime', e.target.value)}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-orange-500"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={worker.noLunchBreak || false}
+                              onChange={(e) => updateWorker(index, 'noLunchBreak', e.target.checked)}
+                              className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                            />
+                            <span className="text-sm text-gray-700">昼休憩なし</span>
+                          </label>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">備考</label>
+                          <input
+                            type="text"
+                            value={worker.remarks || ''}
+                            onChange={(e) => updateWorker(index, 'remarks', e.target.value)}
+                            placeholder="備考・作業内容"
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-orange-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {editData.workers.length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      作業員を追加してください
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 連絡事項 */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  連絡事項
+                </label>
+                <textarea
+                  value={editData.notes}
+                  onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  placeholder="連絡事項があれば入力..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+
+              {/* 注意事項 */}
+              {report.status === 'approved' && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-6">
+                  <p className="text-sm text-orange-700">
+                    <strong>注意:</strong> 保存するとPDFが再生成されます。QRコードのURLも更新されます。
+                  </p>
+                </div>
+              )}
+
+              {/* ボタン */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  disabled={saving}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSaveAndRegenerate}
+                  disabled={saving}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      <span>{report.status === 'approved' ? 'PDF再生成中...' : '保存中...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} />
+                      <span>{report.status === 'approved' ? '保存してPDF再生成' : '保存'}</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

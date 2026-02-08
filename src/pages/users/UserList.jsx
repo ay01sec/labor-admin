@@ -36,17 +36,30 @@ function RoleBadge({ role }) {
       icon: Shield,
       label: '管理者'
     },
-    manager: {
+    office: {
       bg: 'bg-orange-100',
       text: 'text-orange-800',
       icon: Users,
-      label: 'マネージャー'
+      label: '事務員'
     },
-    worker: {
+    manager: {
+      // 後方互換性のため残す（office と同等）
+      bg: 'bg-orange-100',
+      text: 'text-orange-800',
+      icon: Users,
+      label: '事務員'
+    },
+    site_manager: {
       bg: 'bg-blue-100',
       text: 'text-blue-800',
       icon: User,
-      label: 'ワーカー'
+      label: '現場管理者'
+    },
+    worker: {
+      bg: 'bg-gray-100',
+      text: 'text-gray-800',
+      icon: User,
+      label: '作業員'
     }
   };
 
@@ -254,8 +267,9 @@ export default function UserList() {
       <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
         <p className="text-sm">
           <strong>管理者</strong>: 全ての機能にアクセス可能<br />
-          <strong>マネージャー</strong>: 日報承認、一部管理機能にアクセス可能<br />
-          <strong>ワーカー</strong>: 日報入力のみ（管理画面アクセス不可）
+          <strong>事務員</strong>: 管理システムにアクセス可能、日報編集可能<br />
+          <strong>現場管理者</strong>: 日報アプリのみ使用可能（管理画面アクセス不可）<br />
+          <strong>作業員</strong>: 将来の拡張用（現在は未使用）
         </p>
       </div>
 

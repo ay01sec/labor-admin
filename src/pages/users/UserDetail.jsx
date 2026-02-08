@@ -44,7 +44,7 @@ export default function UserDetail() {
     email: '',
     password: '',
     displayName: '',
-    role: 'worker',
+    role: 'site_manager',
     employeeId: '',
     isActive: true
   });
@@ -393,8 +393,9 @@ export default function UserDetail() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="admin">管理者</option>
-                  <option value="manager">マネージャー</option>
-                  <option value="worker">ワーカー</option>
+                  <option value="office">事務員</option>
+                  <option value="site_manager">現場管理者</option>
+                  <option value="worker">作業員</option>
                 </select>
               </div>
               <div>
@@ -433,8 +434,9 @@ export default function UserDetail() {
             <h3 className="font-medium text-gray-800 mb-2">権限の違い</h3>
             <div className="text-sm text-gray-600 space-y-1">
               <p><strong>管理者:</strong> 全ての機能にアクセス可能（マスタ管理、ユーザー管理、設定など）</p>
-              <p><strong>マネージャー:</strong> 日報承認、一部管理機能にアクセス可能</p>
-              <p><strong>ワーカー:</strong> 日報入力のみ（管理画面アクセス不可）</p>
+              <p><strong>事務員:</strong> 管理システムにアクセス可能、日報編集可能</p>
+              <p><strong>現場管理者:</strong> 日報アプリのみ使用可能（管理画面アクセス不可）</p>
+              <p><strong>作業員:</strong> 将来の拡張用（現在は未使用）</p>
             </div>
           </div>
         </form>

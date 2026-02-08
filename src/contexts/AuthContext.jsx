@@ -130,8 +130,8 @@ export function AuthProvider({ children }) {
         throw new Error('このアカウントは無効化されています');
       }
 
-      // 管理画面はadmin/managerのみアクセス可能
-      if (!['admin', 'manager'].includes(userData.role)) {
+      // 管理画面はadmin/office（manager互換）のみアクセス可能
+      if (!['admin', 'office', 'manager'].includes(userData.role)) {
         await signOut(auth);
         throw new Error('管理画面へのアクセス権限がありません');
       }
@@ -401,8 +401,8 @@ export function AuthProvider({ children }) {
             throw new Error('このアカウントは無効化されています');
           }
 
-          // 管理画面はadmin/managerのみ
-          if (!['admin', 'manager'].includes(userData.role)) {
+          // 管理画面はadmin/office（manager互換）のみ
+          if (!['admin', 'office', 'manager'].includes(userData.role)) {
             throw new Error('管理画面へのアクセス権限がありません');
           }
 
@@ -440,9 +440,20 @@ export function AuthProvider({ children }) {
     return userInfo?.role === 'admin';
   }
 
-  // マネージャー以上かどうか
+  // 事務員以上かどうか（管理システムアクセス可能）
+  // manager（旧名称）との互換性を維持
+  function isOfficeOrAbove() {
+    return ['admin', 'office', 'manager'].includes(userInfo?.role);
+  }
+
+  // 現場管理者以上かどうか（日報アプリ使用可能）
+  function isSiteManagerOrAbove() {
+    return ['admin', 'office', 'manager', 'site_manager'].includes(userInfo?.role);
+  }
+
+  // マネージャー以上かどうか（後方互換性のため残す）
   function isManagerOrAbove() {
-    return ['admin', 'manager'].includes(userInfo?.role);
+    return isOfficeOrAbove();
   }
 
   useEffect(() => {
@@ -487,6 +498,8 @@ export function AuthProvider({ children }) {
     logout,
     resetPassword,
     isAdmin,
+    isOfficeOrAbove,
+    isSiteManagerOrAbove,
     isManagerOrAbove,
     loading,
     // MFA関連
