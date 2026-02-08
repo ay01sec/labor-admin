@@ -6,6 +6,11 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data;
     }
 
+    // ユーザーが存在するかどうか
+    function userExists(companyId) {
+      return exists(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid));
+    }
+
     // 管理者かどうか
     function isAdmin(companyId) {
       let userData = getUserData(companyId);
@@ -35,18 +40,19 @@ service cloud.firestore {
 
     // 企業ドキュメント
     match /companies/{companyId} {
-      // 事務員以上が読み取り可能
-      allow read: if request.auth != null && isOfficeOrAbove(companyId);
+      // 認証済みユーザーが読み取り可能（ログイン時の企業検索用）
+      allow read: if request.auth != null;
       // 管理者のみ更新可能（銀行情報・決済情報の変更）
       allow write: if request.auth != null && isAdmin(companyId);
 
       // ユーザーコレクション
       match /users/{userId} {
-        // 自分自身のドキュメントは読み取り可能
+        // 認証済みユーザーが自分のドキュメントを読み取り可能（ログイン確認用）
+        // または事務員以上が全ユーザーを読み取り可能
         allow read: if request.auth != null && (
           request.auth.uid == userId || isOfficeOrAbove(companyId)
         );
-        // 事務員以上が書き込み可能（ただしadminロールの作成は管理者のみ）
+        // 事務員以上が書き込み可能
         allow write: if request.auth != null && isOfficeOrAbove(companyId);
       }
 
