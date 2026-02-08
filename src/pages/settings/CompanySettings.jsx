@@ -795,6 +795,17 @@ export default function CompanySettings() {
           {/* 会社情報タブ */}
           {activeTab === 'company' && (
             <div className="space-y-6">
+              {/* 管理者権限チェック */}
+              {!isAdmin() && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
+                  <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <p className="text-yellow-800 font-medium">閲覧のみ</p>
+                    <p className="text-yellow-700 text-sm">会社情報の変更は管理者のみ可能です。</p>
+                  </div>
+                </div>
+              )}
+
               {/* 企業ID */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">企業ID</h2>
@@ -823,8 +834,9 @@ export default function CompanySettings() {
                       type="text"
                       value={formData.companyName}
                       onChange={(e) => handleChange('companyName', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       required
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -834,7 +846,8 @@ export default function CompanySettings() {
                       value={formData.branch}
                       onChange={(e) => handleChange('branch', e.target.value)}
                       placeholder="本社"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -843,7 +856,8 @@ export default function CompanySettings() {
                       type="text"
                       value={formData.managerName}
                       onChange={(e) => handleChange('managerName', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -853,7 +867,8 @@ export default function CompanySettings() {
                       value={formData.invoiceNumber}
                       onChange={(e) => handleChange('invoiceNumber', e.target.value)}
                       placeholder="T1234567890123"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                 </div>
@@ -872,7 +887,8 @@ export default function CompanySettings() {
                       value={formData.postalCode}
                       onChange={(e) => handleChange('postalCode', e.target.value)}
                       placeholder="000-0000"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -882,7 +898,8 @@ export default function CompanySettings() {
                       value={formData.prefecture}
                       onChange={(e) => handleChange('prefecture', e.target.value)}
                       placeholder="東京都"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -892,7 +909,8 @@ export default function CompanySettings() {
                       value={formData.city}
                       onChange={(e) => handleChange('city', e.target.value)}
                       placeholder="渋谷区"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -902,7 +920,8 @@ export default function CompanySettings() {
                       value={formData.address}
                       onChange={(e) => handleChange('address', e.target.value)}
                       placeholder="1-2-3"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -912,7 +931,8 @@ export default function CompanySettings() {
                       value={formData.building}
                       onChange={(e) => handleChange('building', e.target.value)}
                       placeholder="サンプルビル5F"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                 </div>
@@ -931,7 +951,8 @@ export default function CompanySettings() {
                       value={formData.tel}
                       onChange={(e) => handleChange('tel', e.target.value)}
                       placeholder="03-1234-5678"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div>
@@ -941,7 +962,8 @@ export default function CompanySettings() {
                       value={formData.fax}
                       onChange={(e) => handleChange('fax', e.target.value)}
                       placeholder="03-1234-5679"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -951,7 +973,8 @@ export default function CompanySettings() {
                       value={formData.email}
                       onChange={(e) => handleChange('email', e.target.value)}
                       placeholder="info@example.com"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!isAdmin()}
                     />
                   </div>
                 </div>
@@ -964,6 +987,7 @@ export default function CompanySettings() {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">画像設定</h2>
                 <p className="text-sm text-gray-600 mb-4">
                   PDF書類などに使用するロゴや印鑑の画像を設定できます。
+                  {!isAdmin() && <span className="text-yellow-600 ml-2">（管理者のみ変更可能）</span>}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* ロゴ画像 */}
@@ -979,46 +1003,50 @@ export default function CompanySettings() {
                             alt="ロゴ"
                             className="w-32 h-32 object-contain border border-gray-300 rounded-lg bg-white"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleImageDelete('logoImage')}
-                            disabled={imageUploading.logoImage}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
-                          >
-                            <X size={14} />
-                          </button>
+                          {isAdmin() && (
+                            <button
+                              type="button"
+                              onClick={() => handleImageDelete('logoImage')}
+                              disabled={imageUploading.logoImage}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3 bg-white">
                           <Image size={32} className="text-gray-400" />
                         </div>
                       )}
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          className="hidden"
-                          onChange={(e) => handleImageUpload('logoImage', e.target.files[0])}
-                          disabled={imageUploading.logoImage}
-                        />
-                        <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                          imageUploading.logoImage
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                        }`}>
-                          {imageUploading.logoImage ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              <span>アップロード中...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={14} />
-                              <span>画像を選択</span>
-                            </>
-                          )}
-                        </span>
-                      </label>
+                      {isAdmin() && (
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload('logoImage', e.target.files[0])}
+                            disabled={imageUploading.logoImage}
+                          />
+                          <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                            imageUploading.logoImage
+                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }`}>
+                            {imageUploading.logoImage ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>アップロード中...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={14} />
+                                <span>画像を選択</span>
+                              </>
+                            )}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
 
@@ -1035,46 +1063,50 @@ export default function CompanySettings() {
                             alt="社印"
                             className="w-32 h-32 object-contain border border-gray-300 rounded-lg bg-white"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleImageDelete('companySealImage')}
-                            disabled={imageUploading.companySealImage}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
-                          >
-                            <X size={14} />
-                          </button>
+                          {isAdmin() && (
+                            <button
+                              type="button"
+                              onClick={() => handleImageDelete('companySealImage')}
+                              disabled={imageUploading.companySealImage}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3 bg-white">
                           <Image size={32} className="text-gray-400" />
                         </div>
                       )}
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          className="hidden"
-                          onChange={(e) => handleImageUpload('companySealImage', e.target.files[0])}
-                          disabled={imageUploading.companySealImage}
-                        />
-                        <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                          imageUploading.companySealImage
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                        }`}>
-                          {imageUploading.companySealImage ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              <span>アップロード中...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={14} />
-                              <span>画像を選択</span>
-                            </>
-                          )}
-                        </span>
-                      </label>
+                      {isAdmin() && (
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload('companySealImage', e.target.files[0])}
+                            disabled={imageUploading.companySealImage}
+                          />
+                          <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                            imageUploading.companySealImage
+                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }`}>
+                            {imageUploading.companySealImage ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>アップロード中...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={14} />
+                                <span>画像を選択</span>
+                              </>
+                            )}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
 
@@ -1091,46 +1123,50 @@ export default function CompanySettings() {
                             alt="角印"
                             className="w-32 h-32 object-contain border border-gray-300 rounded-lg bg-white"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleImageDelete('squareSealImage')}
-                            disabled={imageUploading.squareSealImage}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
-                          >
-                            <X size={14} />
-                          </button>
+                          {isAdmin() && (
+                            <button
+                              type="button"
+                              onClick={() => handleImageDelete('squareSealImage')}
+                              disabled={imageUploading.squareSealImage}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3 bg-white">
                           <Image size={32} className="text-gray-400" />
                         </div>
                       )}
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          className="hidden"
-                          onChange={(e) => handleImageUpload('squareSealImage', e.target.files[0])}
-                          disabled={imageUploading.squareSealImage}
-                        />
-                        <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                          imageUploading.squareSealImage
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                        }`}>
-                          {imageUploading.squareSealImage ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              <span>アップロード中...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={14} />
-                              <span>画像を選択</span>
-                            </>
-                          )}
-                        </span>
-                      </label>
+                      {isAdmin() && (
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload('squareSealImage', e.target.files[0])}
+                            disabled={imageUploading.squareSealImage}
+                          />
+                          <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                            imageUploading.squareSealImage
+                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }`}>
+                            {imageUploading.squareSealImage ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>アップロード中...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={14} />
+                                <span>画像を選択</span>
+                              </>
+                            )}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1146,12 +1182,13 @@ export default function CompanySettings() {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">退職金制度</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex items-center">
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className={`flex items-center space-x-2 ${isAdmin() ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                       <input
                         type="checkbox"
                         checked={formData.retirementSystem}
                         onChange={(e) => handleChange('retirementSystem', e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                        disabled={!isAdmin()}
                       />
                       <span className="text-sm font-medium text-gray-700">退職金制度あり</span>
                     </label>
@@ -1163,7 +1200,8 @@ export default function CompanySettings() {
                         type="text"
                         value={formData.retirementNumber}
                         onChange={(e) => handleChange('retirementNumber', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isAdmin()}
                       />
                     </div>
                   )}
@@ -1185,12 +1223,13 @@ export default function CompanySettings() {
                       <p className="text-sm text-orange-600 mb-4">
                         削除された日報はデータベースから完全に削除され、復元できません。
                       </p>
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className={`flex items-center space-x-3 ${isAdmin() ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                         <input
                           type="checkbox"
                           checked={formData.allowReportDeletion}
                           onChange={(e) => handleChange('allowReportDeletion', e.target.checked)}
-                          className="w-5 h-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                          className="w-5 h-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 disabled:opacity-50"
+                          disabled={!isAdmin()}
                         />
                         <span className="text-sm font-medium text-gray-700">
                           日報の削除を許可する
@@ -1219,7 +1258,8 @@ export default function CompanySettings() {
                       <button
                         type="button"
                         onClick={() => setShowCancelModal(true)}
-                        className="mt-4 inline-flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                        disabled={!isAdmin()}
+                        className="mt-4 inline-flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <X size={16} />
                         <span>解約する</span>
@@ -1565,6 +1605,17 @@ export default function CompanySettings() {
           {/* 決済情報タブ */}
           {activeTab === 'billing' && (
             <div className="space-y-8">
+              {/* 管理者権限チェック */}
+              {!isAdmin() && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
+                  <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <p className="text-yellow-800 font-medium">閲覧のみ</p>
+                    <p className="text-yellow-700 text-sm">決済情報の変更は管理者のみ可能です。</p>
+                  </div>
+                </div>
+              )}
+
               {/* ご利用状況 */}
               <div>
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">ご利用状況</h2>
@@ -1632,9 +1683,9 @@ export default function CompanySettings() {
 
                 {/* 支払い方法選択 */}
                 <div className="space-y-3 mb-6">
-                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg transition-colors ${
                     selectedPaymentMethod === 'card' ? 'border-blue-500 bg-blue-50' : ''
-                  }`}>
+                  } ${isAdmin() ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-60'}`}>
                     <input
                       type="radio"
                       name="paymentMethod"
@@ -1642,6 +1693,7 @@ export default function CompanySettings() {
                       checked={selectedPaymentMethod === 'card'}
                       onChange={() => setSelectedPaymentMethod('card')}
                       className="mt-1 text-blue-600"
+                      disabled={!isAdmin()}
                     />
                     <div>
                       <span className="font-medium text-gray-900 flex items-center space-x-2">
@@ -1652,9 +1704,9 @@ export default function CompanySettings() {
                     </div>
                   </label>
 
-                  <label className={`flex items-start space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  <label className={`flex items-start space-x-3 p-4 border rounded-lg transition-colors ${
                     selectedPaymentMethod === 'invoice' ? 'border-blue-500 bg-blue-50' : ''
-                  }`}>
+                  } ${isAdmin() ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-60'}`}>
                     <input
                       type="radio"
                       name="paymentMethod"
@@ -1662,6 +1714,7 @@ export default function CompanySettings() {
                       checked={selectedPaymentMethod === 'invoice'}
                       onChange={() => setSelectedPaymentMethod('invoice')}
                       className="mt-1 text-blue-600"
+                      disabled={!isAdmin()}
                     />
                     <div>
                       <span className="font-medium text-gray-900 flex items-center space-x-2">
@@ -1674,7 +1727,7 @@ export default function CompanySettings() {
                 </div>
 
                 {/* クレジットカード登録フォーム */}
-                {selectedPaymentMethod === 'card' && (
+                {selectedPaymentMethod === 'card' && isAdmin() && (
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-4">カード情報の入力</h3>
                     {PAYJP_PUBLIC_KEY && window.Payjp ? (
@@ -1696,7 +1749,7 @@ export default function CompanySettings() {
                 )}
 
                 {/* 請求書払い申請フォーム */}
-                {selectedPaymentMethod === 'invoice' && (
+                {selectedPaymentMethod === 'invoice' && isAdmin() && (
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-4">請求書払い申請</h3>
                     <div className="space-y-4">
