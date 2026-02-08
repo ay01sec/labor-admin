@@ -33,12 +33,6 @@ export default function UserDetail() {
   const isNew = id === 'new';
   const isSelf = id === userInfo?.id;
 
-  // デバッグログ
-  console.log('=== UserDetail Debug ===');
-  console.log('id from URL:', id);
-  console.log('isNew:', isNew);
-  console.log('companyId:', companyId);
-
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -134,13 +128,8 @@ export default function UserDetail() {
     try {
       if (isNew) {
         // 新規ユーザー作成（Cloud Functionを使用）
-        console.log('=== Cloud Function createUser を呼び出します ===');
-        console.log('companyId:', companyId);
-        console.log('email:', formData.email);
-        console.log('role:', formData.role);
-
         const createUserFn = httpsCallable(functions, 'createUser');
-        const result = await createUserFn({
+        await createUserFn({
           companyId,
           email: formData.email,
           password: formData.password,
@@ -148,9 +137,6 @@ export default function UserDetail() {
           role: formData.role,
           employeeId: formData.employeeId || null
         });
-
-        console.log('=== Cloud Function 成功 ===');
-        console.log('result:', result.data);
 
         toast.success('ユーザーを作成しました');
         navigate('/users');

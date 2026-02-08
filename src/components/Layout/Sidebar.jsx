@@ -20,35 +20,35 @@ import {
 } from 'lucide-react';
 
 const menuItems = [
-  { 
-    id: 'dashboard', 
-    path: '/', 
-    icon: LayoutDashboard, 
-    label: 'ダッシュボード', 
+  {
+    id: 'dashboard',
+    path: '/',
+    icon: LayoutDashboard,
+    label: 'ダッシュボード',
     category: null,
     adminOnly: false
   },
-  { 
-    id: 'employees', 
-    path: '/employees', 
-    icon: Users, 
-    label: '社員管理', 
+  {
+    id: 'employees',
+    path: '/employees',
+    icon: Users,
+    label: '社員管理',
     category: 'マスタ管理',
     adminOnly: false
   },
-  { 
-    id: 'clients', 
-    path: '/clients', 
-    icon: Building2, 
-    label: '取引先管理', 
+  {
+    id: 'clients',
+    path: '/clients',
+    icon: Building2,
+    label: '取引先管理',
     category: 'マスタ管理',
     adminOnly: false
   },
-  { 
-    id: 'sites', 
-    path: '/sites', 
-    icon: MapPin, 
-    label: '現場管理', 
+  {
+    id: 'sites',
+    path: '/sites',
+    icon: MapPin,
+    label: '現場管理',
     category: 'マスタ管理',
     adminOnly: false
   },
@@ -69,37 +69,37 @@ const menuItems = [
     adminOnly: false,
     hidden: true
   },
-  { 
-    id: 'contracts', 
-    path: '/contracts', 
-    icon: FileSignature, 
-    label: '雇用契約書', 
+  {
+    id: 'contracts',
+    path: '/contracts',
+    icon: FileSignature,
+    label: '雇用契約書',
     category: '業務管理',
-    adminOnly: true
+    adminOnly: false  // 事務員も閲覧・編集可能
   },
-  { 
-    id: 'documents', 
-    path: '/documents', 
-    icon: Files, 
-    label: '各種書類', 
+  {
+    id: 'documents',
+    path: '/documents',
+    icon: Files,
+    label: '各種書類',
     category: '業務管理',
-    adminOnly: true
+    adminOnly: false  // 事務員も閲覧・編集可能
   },
-  { 
-    id: 'leaves', 
-    path: '/leaves', 
-    icon: CalendarDays, 
-    label: '有給休暇', 
+  {
+    id: 'leaves',
+    path: '/leaves',
+    icon: CalendarDays,
+    label: '有給休暇',
     category: '業務管理',
-    adminOnly: true
+    adminOnly: false  // 事務員も閲覧・編集可能
   },
-  { 
-    id: 'users', 
-    path: '/users', 
-    icon: Lock, 
-    label: 'ユーザー管理', 
+  {
+    id: 'users',
+    path: '/users',
+    icon: Lock,
+    label: 'ユーザー管理',
     category: 'システム',
-    adminOnly: true
+    adminOnly: false  // 事務員も閲覧・編集可能
   },
   {
     id: 'settings',
@@ -107,7 +107,7 @@ const menuItems = [
     icon: Settings,
     label: '自社情報設定',
     category: 'システム',
-    adminOnly: true
+    adminOnly: false  // 事務員も閲覧可能（一部制限あり）
   },
   {
     id: 'help',

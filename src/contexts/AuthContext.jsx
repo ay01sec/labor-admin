@@ -174,6 +174,11 @@ export function AuthProvider({ children }) {
       setMfaResolver(null);
       setPendingCompany(null);
 
+      // ログイン処理完了
+      loginInProgressRef.current = false;
+      setLoginInProgress(false);
+      setLoading(false);
+
       return user;
     } catch (error) {
       // 2FAエラーの場合はログアウトしない

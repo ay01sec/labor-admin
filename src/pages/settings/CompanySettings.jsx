@@ -739,7 +739,8 @@ export default function CompanySettings() {
           <Settings className="text-gray-500" />
           <span>自社情報設定</span>
         </h1>
-        {isAdmin() && (
+        {/* 銀行情報・決済情報タブは管理者のみ保存可能 */}
+        {(activeTab !== 'bank' && activeTab !== 'billing') || isAdmin() ? (
           <button
             onClick={handleSubmit}
             disabled={saving}
@@ -748,7 +749,7 @@ export default function CompanySettings() {
             <Save size={20} />
             <span>{saving ? '保存中...' : '保存'}</span>
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* エラー表示 */}
@@ -795,17 +796,6 @@ export default function CompanySettings() {
           {/* 会社情報タブ */}
           {activeTab === 'company' && (
             <div className="space-y-6">
-              {/* 管理者権限チェック */}
-              {!isAdmin() && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
-                  <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
-                  <div>
-                    <p className="text-yellow-800 font-medium">閲覧のみ</p>
-                    <p className="text-yellow-700 text-sm">会社情報の変更は管理者のみ可能です。</p>
-                  </div>
-                </div>
-              )}
-
               {/* 企業ID */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">企業ID</h2>
@@ -836,8 +826,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('companyName', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       required
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">支店名</label>
@@ -847,8 +836,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('branch', e.target.value)}
                       placeholder="本社"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">代表者名</label>
@@ -857,8 +845,7 @@ export default function CompanySettings() {
                       value={formData.managerName}
                       onChange={(e) => handleChange('managerName', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">適格事業者番号</label>
@@ -868,8 +855,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('invoiceNumber', e.target.value)}
                       placeholder="T1234567890123"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                 </div>
               </div>
@@ -888,8 +874,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('postalCode', e.target.value)}
                       placeholder="000-0000"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">都道府県</label>
@@ -899,8 +884,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('prefecture', e.target.value)}
                       placeholder="東京都"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">市区町村</label>
@@ -910,8 +894,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('city', e.target.value)}
                       placeholder="渋谷区"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">番地号</label>
@@ -921,8 +904,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('address', e.target.value)}
                       placeholder="1-2-3"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">建物名</label>
@@ -932,8 +914,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('building', e.target.value)}
                       placeholder="サンプルビル5F"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                 </div>
               </div>
@@ -952,8 +933,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('tel', e.target.value)}
                       placeholder="03-1234-5678"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">FAX</label>
@@ -963,8 +943,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('fax', e.target.value)}
                       placeholder="03-1234-5679"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -974,8 +953,7 @@ export default function CompanySettings() {
                       onChange={(e) => handleChange('email', e.target.value)}
                       placeholder="info@example.com"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                   </div>
                 </div>
               </div>
@@ -1188,8 +1166,7 @@ export default function CompanySettings() {
                         checked={formData.retirementSystem}
                         onChange={(e) => handleChange('retirementSystem', e.target.checked)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-                        disabled={!isAdmin()}
-                      />
+                                              />
                       <span className="text-sm font-medium text-gray-700">退職金制度あり</span>
                     </label>
                   </div>
@@ -1201,8 +1178,7 @@ export default function CompanySettings() {
                         value={formData.retirementNumber}
                         onChange={(e) => handleChange('retirementNumber', e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        disabled={!isAdmin()}
-                      />
+                                              />
                     </div>
                   )}
                 </div>
@@ -1229,8 +1205,7 @@ export default function CompanySettings() {
                           checked={formData.allowReportDeletion}
                           onChange={(e) => handleChange('allowReportDeletion', e.target.checked)}
                           className="w-5 h-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 disabled:opacity-50"
-                          disabled={!isAdmin()}
-                        />
+                                                  />
                         <span className="text-sm font-medium text-gray-700">
                           日報の削除を許可する
                         </span>
@@ -1274,6 +1249,17 @@ export default function CompanySettings() {
           {/* 銀行情報タブ */}
           {activeTab === 'bank' && (
             <div>
+              {/* 管理者権限チェック */}
+              {!isAdmin() && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3 mb-6">
+                  <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <p className="text-yellow-800 font-medium">閲覧のみ</p>
+                    <p className="text-yellow-700 text-sm">銀行情報の変更は管理者のみ可能です。</p>
+                  </div>
+                </div>
+              )}
+
               <h2 className="text-lg font-semibold text-gray-800 mb-4">銀行口座情報</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -1283,7 +1269,8 @@ export default function CompanySettings() {
                     value={formData.bankInfo.bankName}
                     onChange={(e) => handleChange('bankInfo.bankName', e.target.value)}
                     placeholder="サンプル銀行"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!isAdmin()}
                   />
                 </div>
                 <div>
@@ -1293,7 +1280,8 @@ export default function CompanySettings() {
                     value={formData.bankInfo.branchName}
                     onChange={(e) => handleChange('bankInfo.branchName', e.target.value)}
                     placeholder="東京支店"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!isAdmin()}
                   />
                 </div>
                 <div>
@@ -1301,7 +1289,8 @@ export default function CompanySettings() {
                   <select
                     value={formData.bankInfo.accountType}
                     onChange={(e) => handleChange('bankInfo.accountType', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!isAdmin()}
                   >
                     <option value="">選択してください</option>
                     <option value="普通">普通</option>
@@ -1315,7 +1304,8 @@ export default function CompanySettings() {
                     value={formData.bankInfo.accountNumber}
                     onChange={(e) => handleChange('bankInfo.accountNumber', e.target.value)}
                     placeholder="1234567"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!isAdmin()}
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -1325,7 +1315,8 @@ export default function CompanySettings() {
                     value={formData.bankInfo.accountHolder}
                     onChange={(e) => handleChange('bankInfo.accountHolder', e.target.value)}
                     placeholder="カ）サンプル"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!isAdmin()}
                   />
                 </div>
               </div>
@@ -1693,8 +1684,7 @@ export default function CompanySettings() {
                       checked={selectedPaymentMethod === 'card'}
                       onChange={() => setSelectedPaymentMethod('card')}
                       className="mt-1 text-blue-600"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                     <div>
                       <span className="font-medium text-gray-900 flex items-center space-x-2">
                         <CreditCard size={18} />
@@ -1714,8 +1704,7 @@ export default function CompanySettings() {
                       checked={selectedPaymentMethod === 'invoice'}
                       onChange={() => setSelectedPaymentMethod('invoice')}
                       className="mt-1 text-blue-600"
-                      disabled={!isAdmin()}
-                    />
+                                          />
                     <div>
                       <span className="font-medium text-gray-900 flex items-center space-x-2">
                         <FileText size={18} />
