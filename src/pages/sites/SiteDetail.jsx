@@ -24,7 +24,7 @@ import {
 export default function SiteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { companyId, isAdmin } = useAuth();
+  const { companyId, isOfficeOrAbove } = useAuth();
   const isNew = id === 'new';
 
   const [loading, setLoading] = useState(!isNew);
@@ -222,7 +222,7 @@ export default function SiteDetail() {
             <span>{isNew ? '現場登録' : formData.siteName}</span>
           </h1>
         </div>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <button
             onClick={handleSubmit}
             disabled={saving}

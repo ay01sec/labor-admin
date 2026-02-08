@@ -39,7 +39,7 @@ const tabs = [
 export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { companyId, isAdmin } = useAuth();
+  const { companyId, isOfficeOrAbove } = useAuth();
   const { employmentTypes } = useEmploymentTypes();
   const isNew = id === 'new';
 
@@ -263,7 +263,7 @@ export default function EmployeeDetail() {
   };
 
   // 表示するタブをフィルタ
-  const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin());
+  const visibleTabs = tabs.filter(tab => !tab.adminOnly || isOfficeOrAbove());
 
   if (loading) {
     return (
@@ -288,7 +288,7 @@ export default function EmployeeDetail() {
             {isNew ? '社員登録' : `${formData.lastName} ${formData.firstName}`}
           </h1>
         </div>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <button
             onClick={handleSubmit}
             disabled={saving}
@@ -378,7 +378,7 @@ export default function EmployeeDetail() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              {isAdmin() && (
+              {isOfficeOrAbove() && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">生年月日</label>
                   <input
@@ -430,7 +430,7 @@ export default function EmployeeDetail() {
           )}
 
           {/* 住所・連絡先タブ */}
-          {activeTab === 'address' && isAdmin() && (
+          {activeTab === 'address' && isOfficeOrAbove() && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -584,7 +584,7 @@ export default function EmployeeDetail() {
           )}
 
           {/* 給与タブ */}
-          {activeTab === 'salary' && isAdmin() && (
+          {activeTab === 'salary' && isOfficeOrAbove() && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">基本給</label>
@@ -727,7 +727,7 @@ export default function EmployeeDetail() {
           )}
 
           {/* 保険タブ（省略 - 同様のパターン） */}
-          {activeTab === 'insurance' && isAdmin() && (
+          {activeTab === 'insurance' && isOfficeOrAbove() && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">社会保険番号</label>
@@ -760,7 +760,7 @@ export default function EmployeeDetail() {
           )}
 
           {/* 家族タブ（省略 - 同様のパターン） */}
-          {activeTab === 'family' && isAdmin() && (
+          {activeTab === 'family' && isOfficeOrAbove() && (
             <div className="text-center text-gray-500 py-8">
               <Users size={48} className="mx-auto mb-4 text-gray-300" />
               <p>家族情報の編集機能は開発中です</p>

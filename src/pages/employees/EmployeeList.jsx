@@ -55,7 +55,7 @@ function EmploymentTypeBadge({ type, employmentTypes }) {
 }
 
 export default function EmployeeList() {
-  const { companyId, isAdmin } = useAuth();
+  const { companyId, isOfficeOrAbove } = useAuth();
   const navigate = useNavigate();
   const { employmentTypes } = useEmploymentTypes();
 
@@ -221,7 +221,7 @@ export default function EmployeeList() {
           <Users className="text-blue-500" />
           <span>社員管理</span>
         </h1>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowImportModal(true)}
@@ -285,7 +285,7 @@ export default function EmployeeList() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    {isAdmin() && (
+                    {isOfficeOrAbove() && (
                       <th className="px-6 py-3 text-left">
                         <input
                           type="checkbox"
@@ -318,7 +318,7 @@ export default function EmployeeList() {
                 <tbody className="divide-y divide-gray-200">
                   {paginatedEmployees.map((employee) => (
                     <tr key={employee.id} className="hover:bg-gray-50">
-                      {isAdmin() && (
+                      {isOfficeOrAbove() && (
                         <td className="px-6 py-4">
                           <input
                             type="checkbox"
@@ -358,7 +358,7 @@ export default function EmployeeList() {
                           >
                             <Edit size={18} />
                           </Link>
-                          {isAdmin() && (
+                          {isOfficeOrAbove() && (
                             <button
                               onClick={() => handleDelete(employee.id)}
                               className="text-red-600 hover:text-red-800"
@@ -427,7 +427,7 @@ export default function EmployeeList() {
           <div className="p-8 text-center text-gray-500">
             <Users size={48} className="mx-auto mb-4 text-gray-300" />
             <p>社員データがありません</p>
-            {isAdmin() && (
+            {isOfficeOrAbove() && (
               <Link
                 to="/employees/new"
                 className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 mt-4"
@@ -443,7 +443,7 @@ export default function EmployeeList() {
       {/* アクションボタン */}
       {filteredEmployees.length > 0 && (
         <div className="flex items-center space-x-4">
-          {isAdmin() && selectedIds.length > 0 && (
+          {isOfficeOrAbove() && selectedIds.length > 0 && (
             <>
               <button
                 onClick={() => {

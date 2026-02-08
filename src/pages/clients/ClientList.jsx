@@ -27,7 +27,7 @@ import {
 import CsvImportModal from '../../components/CsvImport/CsvImportModal';
 
 export default function ClientList() {
-  const { companyId, isAdmin } = useAuth();
+  const { companyId, isOfficeOrAbove } = useAuth();
   
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +125,7 @@ export default function ClientList() {
           <Building2 className="text-green-500" />
           <span>取引先管理</span>
         </h1>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowImportModal(true)}
@@ -225,7 +225,7 @@ export default function ClientList() {
                           >
                             <Edit size={18} />
                           </Link>
-                          {isAdmin() && (
+                          {isOfficeOrAbove() && (
                             <button
                               onClick={() => handleDelete(client.id, client.clientName)}
                               className="text-red-600 hover:text-red-800"
@@ -289,7 +289,7 @@ export default function ClientList() {
           <div className="p-8 text-center text-gray-500">
             <Building2 size={48} className="mx-auto mb-4 text-gray-300" />
             <p>取引先データがありません</p>
-            {isAdmin() && (
+            {isOfficeOrAbove() && (
               <Link
                 to="/clients/new"
                 className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 mt-4"

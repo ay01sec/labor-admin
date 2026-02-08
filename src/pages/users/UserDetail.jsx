@@ -242,8 +242,8 @@ export default function UserDetail() {
           </h1>
         </div>
         <div className="flex items-center space-x-3">
-          {/* パスワードリセット（編集時、自分以外、管理者のみ） */}
-          {!isNew && !isSelf && isAdmin() && (
+          {/* パスワードリセット（編集時、自分以外、事務員以上） */}
+          {!isNew && !isSelf && isOfficeOrAbove() && (
             <button
               onClick={handlePasswordReset}
               className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
@@ -253,8 +253,8 @@ export default function UserDetail() {
               <span>パスワードリセット</span>
             </button>
           )}
-          {/* 削除（編集時、自分以外、管理者のみ） */}
-          {!isNew && !isSelf && isAdmin() && (
+          {/* 削除（編集時、自分以外、事務員以上） */}
+          {!isNew && !isSelf && isOfficeOrAbove() && (
             <button
               onClick={() => setShowDeleteModal(true)}
               className="inline-flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
@@ -265,7 +265,7 @@ export default function UserDetail() {
             </button>
           )}
           {/* 保存 */}
-          {isAdmin() && (
+          {isOfficeOrAbove() && (
             <button
               onClick={handleSubmit}
               disabled={saving}

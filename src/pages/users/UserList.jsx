@@ -93,7 +93,7 @@ function StatusBadge({ isActive }) {
 }
 
 export default function UserList() {
-  const { companyId, userInfo, isAdmin, resetPassword } = useAuth();
+  const { companyId, userInfo, isOfficeOrAbove, resetPassword } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -252,7 +252,7 @@ export default function UserList() {
           <Lock className="text-red-500" />
           <span>ユーザー管理</span>
         </h1>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <Link
             to="/users/new"
             className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -359,7 +359,7 @@ export default function UserList() {
                           >
                             <Edit size={18} />
                           </Link>
-                          {isAdmin() && user.id !== userInfo.id && (
+                          {isOfficeOrAbove() && user.id !== userInfo.id && (
                             <>
                               <button
                                 onClick={() => handlePasswordReset(user.email, user.displayName)}

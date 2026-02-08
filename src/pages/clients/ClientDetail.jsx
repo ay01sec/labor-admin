@@ -20,7 +20,7 @@ import {
 export default function ClientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { companyId, isAdmin } = useAuth();
+  const { companyId, isOfficeOrAbove } = useAuth();
   const isNew = id === 'new';
 
   const [loading, setLoading] = useState(!isNew);
@@ -133,7 +133,7 @@ export default function ClientDetail() {
             <span>{isNew ? '取引先登録' : formData.clientName}</span>
           </h1>
         </div>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <button
             onClick={handleSubmit}
             disabled={saving}

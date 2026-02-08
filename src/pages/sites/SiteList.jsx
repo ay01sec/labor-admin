@@ -47,7 +47,7 @@ function StatusBadge({ status }) {
 }
 
 export default function SiteList() {
-  const { companyId, isAdmin } = useAuth();
+  const { companyId, isOfficeOrAbove } = useAuth();
   
   const [sites, setSites] = useState([]);
   const [clients, setClients] = useState([]);
@@ -167,7 +167,7 @@ export default function SiteList() {
           <MapPin className="text-purple-500" />
           <span>現場管理</span>
         </h1>
-        {isAdmin() && (
+        {isOfficeOrAbove() && (
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowImportModal(true)}
@@ -282,7 +282,7 @@ export default function SiteList() {
                           >
                             <Edit size={18} />
                           </Link>
-                          {isAdmin() && (
+                          {isOfficeOrAbove() && (
                             <button
                               onClick={() => handleDelete(site.id, site.siteName)}
                               className="text-red-600 hover:text-red-800"
@@ -349,7 +349,7 @@ export default function SiteList() {
           <div className="p-8 text-center text-gray-500">
             <MapPin size={48} className="mx-auto mb-4 text-gray-300" />
             <p>現場データがありません</p>
-            {isAdmin() && (
+            {isOfficeOrAbove() && (
               <Link
                 to="/sites/new"
                 className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 mt-4"
