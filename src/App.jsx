@@ -83,11 +83,11 @@ function PrivateRoute({ children, skipMfaCheck = false }) {
   return children;
 }
 
-// 管理者専用ルート
-function AdminRoute({ children }) {
-  const { isAdmin, loading } = useAuth();
+// 事務員以上（管理者・事務員）がアクセス可能なルート
+function OfficeRoute({ children }) {
+  const { isOfficeOrAbove, loading, userInfo } = useAuth();
 
-  if (loading) {
+  if (loading || !userInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -95,7 +95,7 @@ function AdminRoute({ children }) {
     );
   }
 
-  return isAdmin() ? children : <Navigate to="/" />;
+  return isOfficeOrAbove() ? children : <Navigate to="/" />;
 }
 
 function AppRoutes() {
@@ -156,27 +156,27 @@ function AppRoutes() {
         <Route path="/reports/attendance" element={<AttendanceSummary />} />
         <Route path="/reports/:id" element={<ReportDetail />} />
 
-        {/* 管理者専用ルート */}
+        {/* 事務員以上がアクセス可能なルート */}
         <Route path="/contracts" element={
-          <AdminRoute><PlaceholderPage title="雇用契約書管理" /></AdminRoute>
+          <OfficeRoute><PlaceholderPage title="雇用契約書管理" /></OfficeRoute>
         } />
         <Route path="/documents" element={
-          <AdminRoute><PlaceholderPage title="各種書類管理" /></AdminRoute>
+          <OfficeRoute><PlaceholderPage title="各種書類管理" /></OfficeRoute>
         } />
         <Route path="/leaves" element={
-          <AdminRoute><PlaceholderPage title="有給休暇管理" /></AdminRoute>
+          <OfficeRoute><PlaceholderPage title="有給休暇管理" /></OfficeRoute>
         } />
         <Route path="/users" element={
-          <AdminRoute><UserList /></AdminRoute>
+          <OfficeRoute><UserList /></OfficeRoute>
         } />
         <Route path="/users/:id" element={
-          <AdminRoute><UserDetail /></AdminRoute>
+          <OfficeRoute><UserDetail /></OfficeRoute>
         } />
         <Route path="/settings" element={
-          <AdminRoute><CompanySettings /></AdminRoute>
+          <OfficeRoute><CompanySettings /></OfficeRoute>
         } />
         <Route path="/settings/notifications" element={
-          <AdminRoute><NotificationSettings /></AdminRoute>
+          <OfficeRoute><NotificationSettings /></OfficeRoute>
         } />
         <Route path="/settings/mfa" element={
           <PrivateRoute skipMfaCheck><MfaSettings /></PrivateRoute>
