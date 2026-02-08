@@ -211,8 +211,9 @@ exports.registerCard = onCall(
 );
 
 /**
- * 請求書払い申請処理
+ * 請求書払い申請処理 - 一時的に無効化
  */
+/*
 exports.requestInvoicePayment = onCall(
   { region: "asia-northeast1", maxInstances: 10 },
   async (request) => {
@@ -250,6 +251,7 @@ exports.requestInvoicePayment = onCall(
     }
   }
 );
+*/
 
 /**
  * 企業解約処理

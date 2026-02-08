@@ -1694,6 +1694,7 @@ export default function CompanySettings() {
                     </div>
                   </label>
 
+                  {/* 請求書払いは一時的に無効化
                   <label className={`flex items-start space-x-3 p-4 border rounded-lg transition-colors ${
                     selectedPaymentMethod === 'invoice' ? 'border-blue-500 bg-blue-50' : ''
                   } ${isAdmin() ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-60'}`}>
@@ -1713,6 +1714,7 @@ export default function CompanySettings() {
                       <p className="text-sm text-gray-500 mt-1">月末締め翌月末払いの請求書をお送りします</p>
                     </div>
                   </label>
+                  */}
                 </div>
 
                 {/* クレジットカード登録フォーム */}
@@ -1737,7 +1739,7 @@ export default function CompanySettings() {
                   </div>
                 )}
 
-                {/* 請求書払い申請フォーム */}
+                {/* 請求書払い申請フォーム - 一時的に無効化
                 {selectedPaymentMethod === 'invoice' && isAdmin() && (
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-4">請求書払い申請</h3>
@@ -1799,6 +1801,7 @@ export default function CompanySettings() {
                     </div>
                   </div>
                 )}
+                */}
               </div>
 
               <hr />

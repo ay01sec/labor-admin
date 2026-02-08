@@ -29,11 +29,11 @@ y_akagi@improve-biz.com
 
 ## サービス名称
 
-労務管理システム（現場クラウド）
+CONSTRUCTION DX SYSTEM
 
 ## サービスURL
 
-https://construction-manage.improve-biz.com/
+https://labor-admin-20260202.web.app/
 
 ---
 
@@ -41,10 +41,13 @@ https://construction-manage.improve-biz.com/
 
 ### 月額利用料
 
-| プラン | 価格（税込） |
+| 項目 | 価格（税込） |
 |--------|-------------|
-| 基本プラン | ¥1,500〜/月 |
+| 基本料金 | ¥1,000/月 |
+| 追加料金（6人目以降の現場管理者） | ¥100/人/月 |
 
+※現場管理者が5名以下の場合は基本料金のみです。
+※6名以上の場合、6人目から1人あたり月額100円が加算されます。
 ※価格は予告なく変更される場合があります。
 
 ### 初期費用
@@ -56,12 +59,10 @@ https://construction-manage.improve-biz.com/
 ## 支払方法
 
 - クレジットカード（VISA、MasterCard、JCB、American Express、Diners Club）
-- 請求書払い（法人のみ、審査あり）
 
 ## 支払時期
 
-- **クレジットカード**: 毎月末日締め、翌月のカード決済日に請求
-- **請求書払い**: 毎月末日締め、翌月末日払い
+- **クレジットカード**: トライアル終了後、毎月同日に自動課金
 
 ---
 
