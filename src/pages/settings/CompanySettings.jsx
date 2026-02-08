@@ -7,8 +7,9 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db, functions } from '../../services/firebase';
+import { db, functions, storage } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   Save,
   Settings,
@@ -27,6 +28,8 @@ import {
   ChevronDown,
   FileText,
   Loader2,
+  Image,
+  Upload,
 } from 'lucide-react';
 import { DEFAULT_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_COLORS } from '../../constants/employmentTypes';
 
@@ -321,6 +324,12 @@ export default function CompanySettings() {
             employmentTypes: data.employmentTypes?.length > 0 ? data.employmentTypes : DEFAULT_EMPLOYMENT_TYPES,
             allowReportDeletion: data.allowReportDeletion || false
           });
+          // 画像データの取得
+          setImages({
+            logoImage: data.logoImage || null,
+            companySealImage: data.companySealImage || null,
+            squareSealImage: data.squareSealImage || null
+          });
         }
       } catch (error) {
         console.error('データ取得エラー:', error);
@@ -349,6 +358,100 @@ export default function CompanySettings() {
     }
   };
 
+  // 画像アップロードハンドラ
+  const handleImageUpload = async (imageType, file) => {
+    if (!file) return;
+
+    // ファイルサイズチェック（2MB制限）
+    if (file.size > 2 * 1024 * 1024) {
+      setError('ファイルサイズは2MB以下にしてください');
+      return;
+    }
+
+    // ファイル形式チェック
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('JPG、PNG、GIF、WEBP形式の画像のみアップロードできます');
+      return;
+    }
+
+    setImageUploading(prev => ({ ...prev, [imageType]: true }));
+    setError('');
+
+    try {
+      // ファイル名を生成（タイムスタンプ付き）
+      const ext = file.name.split('.').pop();
+      const fileName = `${imageType}_${Date.now()}.${ext}`;
+      const storageRef = ref(storage, `companies/${companyId}/images/${fileName}`);
+
+      // 古い画像があれば削除
+      if (images[imageType]) {
+        try {
+          const oldRef = ref(storage, images[imageType]);
+          await deleteObject(oldRef);
+        } catch (e) {
+          // 古い画像が存在しない場合は無視
+          console.log('Old image not found, skipping delete');
+        }
+      }
+
+      // 新しい画像をアップロード
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      // Firestoreに保存
+      const docRef = doc(db, 'companies', companyId);
+      await updateDoc(docRef, {
+        [imageType]: downloadUrl,
+        updatedAt: serverTimestamp()
+      });
+
+      // state更新
+      setImages(prev => ({ ...prev, [imageType]: downloadUrl }));
+      setSuccess('画像をアップロードしました');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('画像アップロードエラー:', error);
+      setError('画像のアップロードに失敗しました');
+    } finally {
+      setImageUploading(prev => ({ ...prev, [imageType]: false }));
+    }
+  };
+
+  // 画像削除ハンドラ
+  const handleImageDelete = async (imageType) => {
+    if (!images[imageType]) return;
+
+    setImageUploading(prev => ({ ...prev, [imageType]: true }));
+    setError('');
+
+    try {
+      // Storageから削除
+      try {
+        const imageRef = ref(storage, images[imageType]);
+        await deleteObject(imageRef);
+      } catch (e) {
+        console.log('Image not found in storage, skipping delete');
+      }
+
+      // FirestoreからURLを削除
+      const docRef = doc(db, 'companies', companyId);
+      await updateDoc(docRef, {
+        [imageType]: null,
+        updatedAt: serverTimestamp()
+      });
+
+      // state更新
+      setImages(prev => ({ ...prev, [imageType]: null }));
+      setSuccess('画像を削除しました');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('画像削除エラー:', error);
+      setError('画像の削除に失敗しました');
+    } finally {
+      setImageUploading(prev => ({ ...prev, [imageType]: false }));
+    }
+  };
 
   // 保存処理
   const handleSubmit = async (e) => {
@@ -397,6 +500,18 @@ export default function CompanySettings() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelConfirmName, setCancelConfirmName] = useState('');
   const [canceling, setCanceling] = useState(false);
+
+  // 画像設定
+  const [images, setImages] = useState({
+    logoImage: null,
+    companySealImage: null,
+    squareSealImage: null
+  });
+  const [imageUploading, setImageUploading] = useState({
+    logoImage: false,
+    companySealImage: false,
+    squareSealImage: false
+  });
 
   // billing情報の取得
   const fetchBilling = useCallback(async () => {
@@ -840,6 +955,188 @@ export default function CompanySettings() {
                     />
                   </div>
                 </div>
+              </div>
+
+              <hr />
+
+              {/* 画像設定 */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">画像設定</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  PDF書類などに使用するロゴや印鑑の画像を設定できます。
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* ロゴ画像 */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      ロゴ画像
+                    </label>
+                    <div className="flex flex-col items-center">
+                      {images.logoImage ? (
+                        <div className="relative mb-3">
+                          <img
+                            src={images.logoImage}
+                            alt="ロゴ"
+                            className="w-32 h-32 object-contain border border-gray-300 rounded-lg bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleImageDelete('logoImage')}
+                            disabled={imageUploading.logoImage}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3 bg-white">
+                          <Image size={32} className="text-gray-400" />
+                        </div>
+                      )}
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload('logoImage', e.target.files[0])}
+                          disabled={imageUploading.logoImage}
+                        />
+                        <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                          imageUploading.logoImage
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}>
+                          {imageUploading.logoImage ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              <span>アップロード中...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={14} />
+                              <span>画像を選択</span>
+                            </>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 社印画像 */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      社印（丸印）
+                    </label>
+                    <div className="flex flex-col items-center">
+                      {images.companySealImage ? (
+                        <div className="relative mb-3">
+                          <img
+                            src={images.companySealImage}
+                            alt="社印"
+                            className="w-32 h-32 object-contain border border-gray-300 rounded-lg bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleImageDelete('companySealImage')}
+                            disabled={imageUploading.companySealImage}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3 bg-white">
+                          <Image size={32} className="text-gray-400" />
+                        </div>
+                      )}
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload('companySealImage', e.target.files[0])}
+                          disabled={imageUploading.companySealImage}
+                        />
+                        <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                          imageUploading.companySealImage
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}>
+                          {imageUploading.companySealImage ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              <span>アップロード中...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={14} />
+                              <span>画像を選択</span>
+                            </>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 角印画像 */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      角印
+                    </label>
+                    <div className="flex flex-col items-center">
+                      {images.squareSealImage ? (
+                        <div className="relative mb-3">
+                          <img
+                            src={images.squareSealImage}
+                            alt="角印"
+                            className="w-32 h-32 object-contain border border-gray-300 rounded-lg bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleImageDelete('squareSealImage')}
+                            disabled={imageUploading.squareSealImage}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-3 bg-white">
+                          <Image size={32} className="text-gray-400" />
+                        </div>
+                      )}
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload('squareSealImage', e.target.files[0])}
+                          disabled={imageUploading.squareSealImage}
+                        />
+                        <span className={`inline-flex items-center space-x-1 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                          imageUploading.squareSealImage
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}>
+                          {imageUploading.squareSealImage ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              <span>アップロード中...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={14} />
+                              <span>画像を選択</span>
+                            </>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  ※ JPG、PNG、GIF、WEBP形式に対応。ファイルサイズは2MB以下。背景透過のPNG形式を推奨します。
+                </p>
               </div>
 
               <hr />
