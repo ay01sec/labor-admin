@@ -1680,8 +1680,10 @@ exports.deleteUser = onCall(
         .doc(request.auth.uid)
         .get();
 
-      if (!callerDoc.exists || callerDoc.data().role !== "admin") {
-        throw new HttpsError("permission-denied", "管理者のみユーザーを削除できます");
+      const callerRole = callerDoc.exists ? callerDoc.data().role : null;
+      const isOfficeOrAbove = ["admin", "office", "manager"].includes(callerRole);
+      if (!isOfficeOrAbove) {
+        throw new HttpsError("permission-denied", "事務員以上の権限が必要です");
       }
 
       // 対象ユーザーのドキュメントを削除
