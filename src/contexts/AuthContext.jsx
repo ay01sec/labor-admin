@@ -141,8 +141,8 @@ export function AuthProvider({ children }) {
         lastLoginAt: serverTimestamp()
       });
 
-      // 管理者の場合は2FA認証を要求（企業コード00000000は除外）
-      if (needs2FA(userData) && company.companyCode !== '00000000') {
+      // 管理者の場合は2FA認証を要求（企業コード00000000、現場管理者は除外）
+      if (needs2FA(userData) && company.companyCode !== '00000000' && userData.role !== 'site_manager') {
         const pending2FAData = {
           user: { id: user.uid, ...userData },
           company: company
