@@ -825,16 +825,26 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
       const totalRows = 9; // 固定9行（リファレンス準拠）
       const workers = report.workers || [];
 
+      // 勤怠設定を取得
+      const attendanceSettings = companyData?.attendanceSettings || {};
+      const deductLunchBreak = attendanceSettings.deductLunchBreak !== false; // デフォルトtrue
+      const lunchBreakMinutes = attendanceSettings.lunchBreakMinutes || 60;
+
       // 実働時間を計算するヘルパー関数
-      const calcWorkingHours = (startTime, endTime) => {
+      const calcWorkingHours = (startTime, endTime, noLunchBreak) => {
         if (!startTime || !endTime) return "";
         const [startH, startM] = startTime.split(":").map(Number);
         const [endH, endM] = endTime.split(":").map(Number);
         if (isNaN(startH) || isNaN(endH)) return "";
         const startMinutes = startH * 60 + startM;
         const endMinutes = endH * 60 + endM;
-        const diff = endMinutes - startMinutes;
+        let diff = endMinutes - startMinutes;
         if (diff < 0) return "";
+        // 昼休憩控除: deductLunchBreakがtrueかつnoLunchBreakがfalseの場合のみ控除
+        if (deductLunchBreak && !noLunchBreak) {
+          diff -= lunchBreakMinutes;
+          if (diff < 0) diff = 0;
+        }
         const hours = Math.floor(diff / 60);
         const minutes = diff % 60;
         return minutes > 0 ? `${hours}:${String(minutes).padStart(2, "0")}` : `${hours}:00`;
@@ -878,8 +888,8 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
           // 終了時間
           doc.text(worker.endTime || "", x + 3, y + 6, { width: colWidths[2] - 6 });
           x += colWidths[2];
-          // 実働時間
-          const workingHours = calcWorkingHours(worker.startTime, worker.endTime);
+          // 実働時間（昼休憩控除を考慮）
+          const workingHours = calcWorkingHours(worker.startTime, worker.endTime, worker.noLunchBreak);
           doc.text(workingHours, x + 3, y + 6, { width: colWidths[3] - 6 });
           x += colWidths[3];
           // 昼休憩なしチェックボックス
@@ -1235,16 +1245,26 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
       const totalRows = 9;
       const workers = reportData.workers || [];
 
+      // 勤怠設定を取得
+      const attendanceSettings = companyData?.attendanceSettings || {};
+      const deductLunchBreak = attendanceSettings.deductLunchBreak !== false; // デフォルトtrue
+      const lunchBreakMinutes = attendanceSettings.lunchBreakMinutes || 60;
+
       // 実働時間を計算するヘルパー関数
-      const calcWorkingHours = (startTime, endTime) => {
+      const calcWorkingHours = (startTime, endTime, noLunchBreak) => {
         if (!startTime || !endTime) return "";
         const [startH, startM] = startTime.split(":").map(Number);
         const [endH, endM] = endTime.split(":").map(Number);
         if (isNaN(startH) || isNaN(endH)) return "";
         const startMinutes = startH * 60 + startM;
         const endMinutes = endH * 60 + endM;
-        const diff = endMinutes - startMinutes;
+        let diff = endMinutes - startMinutes;
         if (diff < 0) return "";
+        // 昼休憩控除: deductLunchBreakがtrueかつnoLunchBreakがfalseの場合のみ控除
+        if (deductLunchBreak && !noLunchBreak) {
+          diff -= lunchBreakMinutes;
+          if (diff < 0) diff = 0;
+        }
         const hours = Math.floor(diff / 60);
         const minutes = diff % 60;
         return minutes > 0 ? `${hours}:${String(minutes).padStart(2, "0")}` : `${hours}:00`;
@@ -1284,8 +1304,8 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
           x += colWidths[1];
           doc.text(worker.endTime || "", x + 3, y + 6, { width: colWidths[2] - 6 });
           x += colWidths[2];
-          // 実働時間
-          const workingHours = calcWorkingHours(worker.startTime, worker.endTime);
+          // 実働時間（昼休憩控除を考慮）
+          const workingHours = calcWorkingHours(worker.startTime, worker.endTime, worker.noLunchBreak);
           doc.text(workingHours, x + 3, y + 6, { width: colWidths[3] - 6 });
           x += colWidths[3];
           // 昼休憩なしチェックボックス
