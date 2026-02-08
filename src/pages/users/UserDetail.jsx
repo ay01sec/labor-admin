@@ -11,9 +11,8 @@ import {
   getDocs,
   serverTimestamp
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { db, auth, functions } from '../../services/firebase';
+import { db, functions } from '../../services/firebase';
 import {
   Save,
   ArrowLeft,
@@ -30,9 +29,15 @@ import toast from 'react-hot-toast';
 export default function UserDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { companyId, userInfo, isAdmin, resetPassword } = useAuth();
+  const { companyId, userInfo, isAdmin, isOfficeOrAbove, resetPassword } = useAuth();
   const isNew = id === 'new';
   const isSelf = id === userInfo?.id;
+
+  // デバッグログ
+  console.log('=== UserDetail Debug ===');
+  console.log('id from URL:', id);
+  console.log('isNew:', isNew);
+  console.log('companyId:', companyId);
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -128,32 +133,27 @@ export default function UserDetail() {
 
     try {
       if (isNew) {
-        // 新規ユーザー作成
-        // Firebase Authenticationにユーザー作成
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          formData.email,
-          formData.password
-        );
-        const newUserId = userCredential.user.uid;
+        // 新規ユーザー作成（Cloud Functionを使用）
+        console.log('=== Cloud Function createUser を呼び出します ===');
+        console.log('companyId:', companyId);
+        console.log('email:', formData.email);
+        console.log('role:', formData.role);
 
-        // Firestoreにユーザードキュメント作成
-        const userDocRef = doc(db, 'companies', companyId, 'users', newUserId);
-        await setDoc(userDocRef, {
+        const createUserFn = httpsCallable(functions, 'createUser');
+        const result = await createUserFn({
+          companyId,
           email: formData.email,
+          password: formData.password,
           displayName: formData.displayName,
           role: formData.role,
-          employeeId: formData.employeeId || null,
-          isActive: true,
-          lastLoginAt: null,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          employeeId: formData.employeeId || null
         });
 
-        // 注意: 新しいユーザーを作成すると、現在のユーザーがログアウトされる可能性がある
-        // そのため、Admin SDKを使用するのが理想的だが、クライアント側では制限がある
-        alert('ユーザーを作成しました。ページを再読み込みしてログインし直してください。');
-        window.location.href = '/login';
+        console.log('=== Cloud Function 成功 ===');
+        console.log('result:', result.data);
+
+        toast.success('ユーザーを作成しました');
+        navigate('/users');
         return;
 
       } else {
@@ -177,13 +177,18 @@ export default function UserDetail() {
       navigate('/users');
     } catch (error) {
       console.error('保存エラー:', error);
-      
-      if (error.code === 'auth/email-already-in-use') {
+      console.error('エラーコード:', error.code);
+      console.error('エラー詳細:', error.details);
+
+      // Cloud Functionからのエラー
+      if (error.code === 'functions/already-exists') {
         setError('このメールアドレスは既に使用されています');
-      } else if (error.code === 'auth/invalid-email') {
-        setError('メールアドレスの形式が正しくありません');
-      } else if (error.code === 'auth/weak-password') {
-        setError('パスワードが弱すぎます。6文字以上にしてください');
+      } else if (error.code === 'functions/invalid-argument') {
+        setError(error.message || 'メールアドレスの形式が正しくありません');
+      } else if (error.code === 'functions/permission-denied') {
+        setError(error.message || '権限がありません');
+      } else if (error.code === 'functions/internal') {
+        setError(error.message || 'サーバーエラーが発生しました');
       } else {
         setError('保存に失敗しました: ' + error.message);
       }
@@ -303,13 +308,6 @@ export default function UserDetail() {
         </div>
       )}
 
-      {/* 新規作成時の注意 */}
-      {isNew && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg flex items-start space-x-2">
-          <Info size={20} className="flex-shrink-0 mt-0.5" />
-          <span>ユーザーを作成すると、現在のセッションがログアウトされます。作成後は再度ログインしてください。</span>
-        </div>
-      )}
 
       {/* フォーム */}
       <div className="bg-white rounded-xl shadow-sm p-6">
@@ -392,7 +390,8 @@ export default function UserDetail() {
                   disabled={isSelf}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="admin">管理者</option>
+                  {/* 管理者は全ロール作成可能、事務員はadmin以外のみ */}
+                  {isAdmin() && <option value="admin">管理者</option>}
                   <option value="office">事務員</option>
                   <option value="site_manager">現場管理者</option>
                   <option value="worker">作業員</option>

@@ -1532,3 +1532,184 @@ exports.onAutoApproveReport = onDocumentUpdated(
     }
   }
 );
+
+/**
+ * ユーザー作成（Admin SDK使用）
+ * 事務員以上が呼び出し可能
+ * - 管理者: 全ロール作成可能
+ * - 事務員: admin以外のロール作成可能
+ */
+exports.createUser = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    console.log("createUser called with data:", JSON.stringify(request.data));
+
+    if (!request.auth) {
+      console.log("No auth provided");
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    console.log("Auth UID:", request.auth.uid);
+
+    const { companyId, email, password, displayName, role, employeeId } = request.data;
+
+    // バリデーション
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+    if (!email || !email.trim()) {
+      throw new HttpsError("invalid-argument", "メールアドレスは必須です");
+    }
+    if (!password || password.length < 6) {
+      throw new HttpsError("invalid-argument", "パスワードは6文字以上で入力してください");
+    }
+    if (!displayName || !displayName.trim()) {
+      throw new HttpsError("invalid-argument", "表示名は必須です");
+    }
+    if (!role) {
+      throw new HttpsError("invalid-argument", "権限は必須です");
+    }
+
+    try {
+      // 呼び出し元ユーザーの権限をチェック
+      const callerDoc = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!callerDoc.exists) {
+        throw new HttpsError("permission-denied", "ユーザー情報が見つかりません");
+      }
+
+      const callerRole = callerDoc.data().role;
+      const isCallerAdmin = callerRole === "admin";
+      const isCallerOffice = ["admin", "office", "manager"].includes(callerRole);
+
+      if (!isCallerOffice) {
+        throw new HttpsError("permission-denied", "ユーザー作成権限がありません");
+      }
+
+      // 事務員がadminを作成しようとした場合はエラー
+      if (!isCallerAdmin && role === "admin") {
+        throw new HttpsError("permission-denied", "管理者権限のユーザーを作成する権限がありません");
+      }
+
+      // Firebase Authにユーザー作成
+      console.log("Creating Firebase Auth user:", email.trim());
+      const userRecord = await auth.createUser({
+        email: email.trim(),
+        password: password,
+        displayName: displayName.trim(),
+      });
+      console.log("Firebase Auth user created:", userRecord.uid);
+
+      // Firestoreにユーザードキュメント作成
+      const userRef = db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(userRecord.uid);
+
+      console.log("Creating Firestore user document at:", userRef.path);
+      await userRef.set({
+        email: email.trim(),
+        displayName: displayName.trim(),
+        role: role,
+        employeeId: employeeId || null,
+        isActive: true,
+        lastLoginAt: null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log("Firestore user document created successfully");
+
+      return {
+        success: true,
+        userId: userRecord.uid,
+      };
+    } catch (error) {
+      console.error("ユーザー作成エラー:", error);
+      console.error("エラーコード:", error.code);
+      console.error("エラーメッセージ:", error.message);
+      console.error("エラースタック:", error.stack);
+
+      if (error.code === "auth/email-already-exists") {
+        throw new HttpsError("already-exists", "このメールアドレスは既に登録されています");
+      }
+      if (error.code === "auth/invalid-email") {
+        throw new HttpsError("invalid-argument", "メールアドレスの形式が正しくありません");
+      }
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError("internal", "ユーザー作成に失敗しました: " + error.message);
+    }
+  }
+);
+
+/**
+ * ユーザー削除（Admin SDK使用）
+ * 管理者のみが呼び出し可能
+ */
+exports.deleteUser = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { targetUserId, companyId } = request.data;
+
+    if (!targetUserId || !companyId) {
+      throw new HttpsError("invalid-argument", "targetUserIdとcompanyIdは必須です");
+    }
+
+    // 自分自身は削除できない
+    if (targetUserId === request.auth.uid) {
+      throw new HttpsError("invalid-argument", "自分自身を削除することはできません");
+    }
+
+    try {
+      // 呼び出し元ユーザーの権限をチェック
+      const callerDoc = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+        throw new HttpsError("permission-denied", "管理者のみユーザーを削除できます");
+      }
+
+      // 対象ユーザーのドキュメントを削除
+      const targetUserRef = db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(targetUserId);
+
+      const targetUserDoc = await targetUserRef.get();
+      if (!targetUserDoc.exists) {
+        throw new HttpsError("not-found", "ユーザーが見つかりません");
+      }
+
+      // Firestoreからユーザードキュメント削除
+      await targetUserRef.delete();
+
+      // Firebase Authからユーザー削除
+      await auth.deleteUser(targetUserId);
+
+      return { success: true };
+    } catch (error) {
+      console.error("ユーザー削除エラー:", error);
+
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError("internal", "ユーザー削除に失敗しました");
+    }
+  }
+);
