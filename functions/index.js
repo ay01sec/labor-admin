@@ -631,6 +631,9 @@ exports.generateBulkPdf = onCall(
       // フォントパス
       const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
 
+      // ロゴ画像をダウンロード（一度だけ）
+      const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
+
       const zip = new JSZip();
       const reports = [];
 
@@ -641,7 +644,7 @@ exports.generateBulkPdf = onCall(
       // 各日報のPDFを生成
       for (const report of reports) {
         const signatureImageBuffer = await downloadSignatureImage(report.clientSignature?.imageUrl);
-        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer);
+        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer);
         const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
         const dateStr = formatDateForFilename(reportDate);
         const siteName = (report.siteName || "不明").replace(/[/\\?%*:|"<>]/g, "_");
@@ -685,7 +688,7 @@ async function downloadSignatureImage(imageUrl) {
 /**
  * 日報PDFを生成（テンプレート形式）
  */
-function generateReportPdf(report, companyData, fontPath, signatureImageBuffer) {
+function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -713,13 +716,40 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer) 
         : report.submittedAt ? new Date(report.submittedAt) : new Date();
       const reportDateStr = `${submittedAt.getMonth() + 1}月${submittedAt.getDate()}日`;
 
-      // === 報告日 ===
+      // === ロゴ・会社名・報告日（上段） ===
+      let currentY = 50;
+      const logoHeight = 40;
+
+      // ロゴ画像（左側）
+      if (logoImageBuffer) {
+        try {
+          doc.image(logoImageBuffer, LEFT, currentY, {
+            fit: [logoHeight, logoHeight],
+          });
+        } catch (e) {
+          console.error("ロゴ画像埋め込みエラー:", e);
+        }
+      }
+
+      // 会社名（ロゴの右隣）
+      const companyNameX = logoImageBuffer ? LEFT + logoHeight + 10 : LEFT;
+      doc.fontSize(14).fillColor("#000000");
+      doc.text(companyData.companyName || "", companyNameX, currentY + 12, {
+        width: 300,
+      });
+
+      // 報告日（右側）
       doc.fontSize(10).fillColor("#000000");
-      doc.text(`報告日：${reportDateStr}`, LEFT, 50);
-      doc.moveDown(0.5);
+      doc.text(`報告日：${reportDateStr}`, RIGHT - 100, currentY + 15, {
+        width: 100,
+        align: "right",
+      });
+
+      currentY += logoHeight + 15;
+      doc.y = currentY;
 
       // === ヘッダー2行構成 ===
-      const headerTop = doc.y;
+      const headerTop = currentY;
       const row1H = 55;        // 上段（元請確認欄）高さを大きく
       const row2H = 22;        // 下段（作業日報）通常高さ
       const labelW = 70;       // 「元請確認欄」「作業日報」列
@@ -927,8 +957,11 @@ exports.generateReportPdfWithQR = onCall(
       // 署名画像をダウンロード
       const signatureImageBuffer = await downloadSignatureImage(report.clientSignature?.imageUrl);
 
+      // ロゴ画像をダウンロード
+      const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
+
       // PDF生成
-      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer);
+      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer);
 
       // 日付文字列を生成
       const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
@@ -1034,7 +1067,7 @@ async function resolveApprovalSettings(companyId, siteId) {
 /**
  * 自動承認用PDF生成（テンプレート形式・署名画像付き）
  */
-function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer) {
+function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer, logoImageBuffer) {
   return new Promise((resolve, reject) => {
     try {
       const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
@@ -1063,13 +1096,40 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
         : reportData.submittedAt ? new Date(reportData.submittedAt) : new Date();
       const reportDateStr = `${submittedAt.getMonth() + 1}月${submittedAt.getDate()}日`;
 
-      // === 報告日 ===
+      // === ロゴ・会社名・報告日（上段） ===
+      let currentY = 50;
+      const logoHeight = 40;
+
+      // ロゴ画像（左側）
+      if (logoImageBuffer) {
+        try {
+          doc.image(logoImageBuffer, LEFT, currentY, {
+            fit: [logoHeight, logoHeight],
+          });
+        } catch (e) {
+          console.error("ロゴ画像埋め込みエラー:", e);
+        }
+      }
+
+      // 会社名（ロゴの右隣）
+      const companyNameX = logoImageBuffer ? LEFT + logoHeight + 10 : LEFT;
+      doc.fontSize(14).fillColor("#000000");
+      doc.text(companyData.companyName || "", companyNameX, currentY + 12, {
+        width: 300,
+      });
+
+      // 報告日（右側）
       doc.fontSize(10).fillColor("#000000");
-      doc.text(`報告日：${reportDateStr}`, LEFT, 50);
-      doc.moveDown(0.5);
+      doc.text(`報告日：${reportDateStr}`, RIGHT - 100, currentY + 15, {
+        width: 100,
+        align: "right",
+      });
+
+      currentY += logoHeight + 15;
+      doc.y = currentY;
 
       // === ヘッダー2行構成 ===
-      const headerTop = doc.y;
+      const headerTop = currentY;
       const row1H = 55;
       const row2H = 22;
       const labelW = 70;
@@ -1267,9 +1327,10 @@ exports.onAutoApproveReport = onDocumentUpdated(
         const companyDoc = await db.collection("companies").doc(companyId).get();
         const companyData = companyDoc.data();
 
-        // サイン画像ダウンロード + PDF生成
+        // サイン画像・ロゴ画像ダウンロード + PDF生成
         const signatureImageBuffer = await downloadSignatureImage(afterData.clientSignature?.imageUrl);
-        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer);
+        const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
+        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer, logoImageBuffer);
 
         // 日付文字列を生成
         const reportDate = afterData.reportDate?.toDate
