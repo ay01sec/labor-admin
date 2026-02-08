@@ -819,11 +819,26 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
 
       // === 作業員テーブル ===
       const tableTop = doc.y;
-      const colWidths = [100, 80, 80, 70, 165];
-      const headers = ["氏名", "開始時間", "終了時間", "昼休憩なし", "備考及び作業内容"];
+      const colWidths = [90, 55, 55, 50, 55, 190];
+      const headers = ["氏名", "開始時間", "終了時間", "実働時間", "昼休憩なし", "備考及び作業内容"];
       const rowHeight = 22;
       const totalRows = 9; // 固定9行（リファレンス準拠）
       const workers = report.workers || [];
+
+      // 実働時間を計算するヘルパー関数
+      const calcWorkingHours = (startTime, endTime) => {
+        if (!startTime || !endTime) return "";
+        const [startH, startM] = startTime.split(":").map(Number);
+        const [endH, endM] = endTime.split(":").map(Number);
+        if (isNaN(startH) || isNaN(endH)) return "";
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+        const diff = endMinutes - startMinutes;
+        if (diff < 0) return "";
+        const hours = Math.floor(diff / 60);
+        const minutes = diff % 60;
+        return minutes > 0 ? `${hours}:${String(minutes).padStart(2, "0")}` : `${hours}:00`;
+      };
 
       // テーブルヘッダー
       doc.rect(LEFT, tableTop, WIDTH, rowHeight).stroke();
@@ -863,21 +878,25 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
           // 終了時間
           doc.text(worker.endTime || "", x + 3, y + 6, { width: colWidths[2] - 6 });
           x += colWidths[2];
+          // 実働時間
+          const workingHours = calcWorkingHours(worker.startTime, worker.endTime);
+          doc.text(workingHours, x + 3, y + 6, { width: colWidths[3] - 6 });
+          x += colWidths[3];
           // 昼休憩なしチェックボックス
-          const cbX = x + (colWidths[3] / 2) - 6;
+          const cbX = x + (colWidths[4] / 2) - 6;
           const cbY = y + 5;
           doc.rect(cbX, cbY, 12, 12).stroke();
           if (worker.noLunchBreak) {
             doc.moveTo(cbX + 2, cbY + 6).lineTo(cbX + 5, cbY + 10)
               .lineTo(cbX + 10, cbY + 2).stroke();
           }
-          x += colWidths[3];
+          x += colWidths[4];
           // 備考
-          doc.text(worker.remarks || "", x + 3, y + 6, { width: colWidths[4] - 6 });
+          doc.text(worker.remarks || "", x + 3, y + 6, { width: colWidths[5] - 6 });
         } else {
           // 空行のチェックボックスのみ描画
-          x = LEFT + colWidths[0] + colWidths[1] + colWidths[2];
-          const cbX = x + (colWidths[3] / 2) - 6;
+          x = LEFT + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3];
+          const cbX = x + (colWidths[4] / 2) - 6;
           const cbY = y + 5;
           doc.rect(cbX, cbY, 12, 12).stroke();
         }
@@ -1210,11 +1229,26 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
 
       // === 作業員テーブル ===
       const tableTop = doc.y;
-      const colWidths = [100, 80, 80, 70, 165];
-      const headers = ["氏名", "開始時間", "終了時間", "昼休憩なし", "備考及び作業内容"];
+      const colWidths = [90, 55, 55, 50, 55, 190];
+      const headers = ["氏名", "開始時間", "終了時間", "実働時間", "昼休憩なし", "備考及び作業内容"];
       const rowHeight = 22;
       const totalRows = 9;
       const workers = reportData.workers || [];
+
+      // 実働時間を計算するヘルパー関数
+      const calcWorkingHours = (startTime, endTime) => {
+        if (!startTime || !endTime) return "";
+        const [startH, startM] = startTime.split(":").map(Number);
+        const [endH, endM] = endTime.split(":").map(Number);
+        if (isNaN(startH) || isNaN(endH)) return "";
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+        const diff = endMinutes - startMinutes;
+        if (diff < 0) return "";
+        const hours = Math.floor(diff / 60);
+        const minutes = diff % 60;
+        return minutes > 0 ? `${hours}:${String(minutes).padStart(2, "0")}` : `${hours}:00`;
+      };
 
       // テーブルヘッダー
       doc.rect(LEFT, tableTop, WIDTH, rowHeight).stroke();
@@ -1250,18 +1284,23 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
           x += colWidths[1];
           doc.text(worker.endTime || "", x + 3, y + 6, { width: colWidths[2] - 6 });
           x += colWidths[2];
-          const cbX = x + (colWidths[3] / 2) - 6;
+          // 実働時間
+          const workingHours = calcWorkingHours(worker.startTime, worker.endTime);
+          doc.text(workingHours, x + 3, y + 6, { width: colWidths[3] - 6 });
+          x += colWidths[3];
+          // 昼休憩なしチェックボックス
+          const cbX = x + (colWidths[4] / 2) - 6;
           const cbY = y + 5;
           doc.rect(cbX, cbY, 12, 12).stroke();
           if (worker.noLunchBreak) {
             doc.moveTo(cbX + 2, cbY + 6).lineTo(cbX + 5, cbY + 10)
               .lineTo(cbX + 10, cbY + 2).stroke();
           }
-          x += colWidths[3];
-          doc.text(worker.remarks || "", x + 3, y + 6, { width: colWidths[4] - 6 });
+          x += colWidths[4];
+          doc.text(worker.remarks || "", x + 3, y + 6, { width: colWidths[5] - 6 });
         } else {
-          x = LEFT + colWidths[0] + colWidths[1] + colWidths[2];
-          const cbX = x + (colWidths[3] / 2) - 6;
+          x = LEFT + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3];
+          const cbX = x + (colWidths[4] / 2) - 6;
           const cbY = y + 5;
           doc.rect(cbX, cbY, 12, 12).stroke();
         }
