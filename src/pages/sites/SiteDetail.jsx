@@ -43,6 +43,10 @@ export default function SiteDetail() {
     approvalSettings: {
       mode: 'default',
       autoApprovalEmails: []
+    },
+    lunchBreakSettings: {
+      deductLunchBreak: true,
+      lunchBreakMinutes: 60
     }
   });
 
@@ -83,6 +87,10 @@ export default function SiteDetail() {
               approvalSettings: {
                 mode: data.approvalSettings?.mode || 'default',
                 autoApprovalEmails: data.approvalSettings?.autoApprovalEmails || []
+              },
+              lunchBreakSettings: {
+                deductLunchBreak: data.lunchBreakSettings?.deductLunchBreak !== false,
+                lunchBreakMinutes: data.lunchBreakSettings?.lunchBreakMinutes ?? 60
               }
             });
           } else {
@@ -385,6 +393,87 @@ export default function SiteDetail() {
                 </div>
               </div>
             )}
+          </div>
+
+          <hr />
+
+          {/* 昼休憩設定 */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">昼休憩設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              この現場の日報で実働時間を計算する際の昼休憩控除設定です。
+            </p>
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deductLunchBreak"
+                    checked={formData.lunchBreakSettings?.deductLunchBreak === true}
+                    onChange={() => setFormData(prev => ({
+                      ...prev,
+                      lunchBreakSettings: { ...prev.lunchBreakSettings, deductLunchBreak: true }
+                    }))}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">昼休憩を稼働時間から控除する</span>
+                    <p className="text-sm text-gray-500">
+                      昼休憩ありの場合、設定した休憩時間を差し引いて実働時間を計算します。
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deductLunchBreak"
+                    checked={formData.lunchBreakSettings?.deductLunchBreak === false}
+                    onChange={() => setFormData(prev => ({
+                      ...prev,
+                      lunchBreakSettings: { ...prev.lunchBreakSettings, deductLunchBreak: false }
+                    }))}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">昼休憩を稼働時間に含む</span>
+                    <p className="text-sm text-gray-500">
+                      昼休憩の有無に関わらず、開始〜終了の全時間を実働時間として計算します。
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {formData.lunchBreakSettings?.deductLunchBreak && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">昼休憩の控除時間</h3>
+                  <select
+                    value={formData.lunchBreakSettings?.lunchBreakMinutes || 60}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      lunchBreakSettings: { ...prev.lunchBreakSettings, lunchBreakMinutes: Number(e.target.value) }
+                    }))}
+                    className="w-full md:w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value={30}>30分</option>
+                    <option value={45}>45分</option>
+                    <option value={60}>60分（1時間）</option>
+                    <option value={90}>90分（1時間30分）</option>
+                    <option value={120}>120分（2時間）</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    ※ 「昼休憩なし」にチェックが入っている作業員は、この設定に関わらず控除されません。
+                  </p>
+                </div>
+              )}
+
+              <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+                <strong>計算例（8:00〜17:00の場合）:</strong>
+                <br />
+                {formData.lunchBreakSettings?.deductLunchBreak
+                  ? `→ 昼休憩あり: ${9 - (formData.lunchBreakSettings?.lunchBreakMinutes || 60) / 60}時間 / 昼休憩なし: 9時間`
+                  : '→ 昼休憩の有無に関わらず: 9時間'}
+              </div>
+            </div>
           </div>
         </form>
       </div>

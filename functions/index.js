@@ -644,15 +644,18 @@ exports.generateBulkPdf = onCall(
       // 各日報のPDFを生成
       for (const report of reports) {
         const signatureImageBuffer = await downloadSignatureImage(report.clientSignature?.imageUrl);
-        // 現場データから元請会社名を取得
+        // 現場データから元請会社名と昼休憩設定を取得
         let clientName = null;
+        let siteLunchBreakSettings = null;
         if (report.siteId) {
           const siteDoc = await db.collection("companies").doc(companyId).collection("sites").doc(report.siteId).get();
           if (siteDoc.exists) {
-            clientName = siteDoc.data().clientName || null;
+            const siteData = siteDoc.data();
+            clientName = siteData.clientName || null;
+            siteLunchBreakSettings = siteData.lunchBreakSettings || null;
           }
         }
-        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName);
+        const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName, siteLunchBreakSettings);
         const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
         const dateStr = formatDateForFilename(reportDate);
         const siteName = (report.siteName || "不明").replace(/[/\\?%*:|"<>]/g, "_");
@@ -696,7 +699,7 @@ async function downloadSignatureImage(imageUrl) {
 /**
  * 日報PDFを生成（テンプレート形式）
  */
-function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName) {
+function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName, siteLunchBreakSettings) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -825,10 +828,10 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
       const totalRows = 9; // 固定9行（リファレンス準拠）
       const workers = report.workers || [];
 
-      // 勤怠設定を取得
-      const attendanceSettings = companyData?.attendanceSettings || {};
-      const deductLunchBreak = attendanceSettings.deductLunchBreak !== false; // デフォルトtrue
-      const lunchBreakMinutes = attendanceSettings.lunchBreakMinutes || 60;
+      // 昼休憩設定を取得（現場設定を優先、なければ会社設定）
+      const lunchSettings = siteLunchBreakSettings || companyData?.attendanceSettings || {};
+      const deductLunchBreak = lunchSettings.deductLunchBreak !== false; // デフォルトtrue
+      const lunchBreakMinutes = lunchSettings.lunchBreakMinutes || 60;
 
       // 実働時間を計算するヘルパー関数
       const calcWorkingHours = (startTime, endTime, noLunchBreak) => {
@@ -999,17 +1002,20 @@ exports.generateReportPdfWithQR = onCall(
       // ロゴ画像をダウンロード
       const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
 
-      // 現場データから元請会社名を取得
+      // 現場データから元請会社名と昼休憩設定を取得
       let clientName = null;
+      let siteLunchBreakSettings = null;
       if (report.siteId) {
         const siteDoc = await db.collection("companies").doc(companyId).collection("sites").doc(report.siteId).get();
         if (siteDoc.exists) {
-          clientName = siteDoc.data().clientName || null;
+          const siteData = siteDoc.data();
+          clientName = siteData.clientName || null;
+          siteLunchBreakSettings = siteData.lunchBreakSettings || null;
         }
       }
 
       // PDF生成
-      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName);
+      const pdfBuffer = await generateReportPdf(report, companyData, fontPath, signatureImageBuffer, logoImageBuffer, clientName, siteLunchBreakSettings);
 
       // 日付文字列を生成
       const reportDate = report.reportDate?.toDate ? report.reportDate.toDate() : new Date(report.reportDate);
@@ -1115,7 +1121,7 @@ async function resolveApprovalSettings(companyId, siteId) {
 /**
  * 自動承認用PDF生成（テンプレート形式・署名画像付き）
  */
-function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer, logoImageBuffer, clientName) {
+function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer, logoImageBuffer, clientName, siteLunchBreakSettings) {
   return new Promise((resolve, reject) => {
     try {
       const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
@@ -1245,10 +1251,10 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
       const totalRows = 9;
       const workers = reportData.workers || [];
 
-      // 勤怠設定を取得
-      const attendanceSettings = companyData?.attendanceSettings || {};
-      const deductLunchBreak = attendanceSettings.deductLunchBreak !== false; // デフォルトtrue
-      const lunchBreakMinutes = attendanceSettings.lunchBreakMinutes || 60;
+      // 昼休憩設定を取得（現場設定を優先、なければ会社設定）
+      const lunchSettings = siteLunchBreakSettings || companyData?.attendanceSettings || {};
+      const deductLunchBreak = lunchSettings.deductLunchBreak !== false; // デフォルトtrue
+      const lunchBreakMinutes = lunchSettings.lunchBreakMinutes || 60;
 
       // 実働時間を計算するヘルパー関数
       const calcWorkingHours = (startTime, endTime, noLunchBreak) => {
@@ -1411,17 +1417,20 @@ exports.onAutoApproveReport = onDocumentUpdated(
         const signatureImageBuffer = await downloadSignatureImage(afterData.clientSignature?.imageUrl);
         const logoImageBuffer = await downloadSignatureImage(companyData.logoImage);
 
-        // 現場データから元請会社名を取得
+        // 現場データから元請会社名と昼休憩設定を取得
         let clientName = null;
+        let siteLunchBreakSettings = null;
         if (afterData.siteId) {
           const siteDoc = await db.collection("companies").doc(companyId).collection("sites").doc(afterData.siteId).get();
           if (siteDoc.exists) {
-            clientName = siteDoc.data().clientName || null;
+            const siteData = siteDoc.data();
+            clientName = siteData.clientName || null;
+            siteLunchBreakSettings = siteData.lunchBreakSettings || null;
           }
         }
 
         // PDF生成
-        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer, logoImageBuffer, clientName);
+        const pdfBuffer = await generateReportPdfForEmail(afterData, companyData, signatureImageBuffer, logoImageBuffer, clientName, siteLunchBreakSettings);
 
         // 日付文字列を生成
         const reportDate = afterData.reportDate?.toDate

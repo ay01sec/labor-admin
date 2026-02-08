@@ -13,7 +13,8 @@ export default function AttendanceSummary() {
   });
   const [summaryData, setSummaryData] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [attendanceSettings, setAttendanceSettings] = useState({
+  const [sites, setSites] = useState({});
+  const [companySettings, setCompanySettings] = useState({
     deductLunchBreak: true,
     lunchBreakMinutes: 60,
   });
@@ -31,14 +32,22 @@ export default function AttendanceSummary() {
   };
 
   // 労働時間計算 (startTime, endTime -> hours)
-  const calcWorkHours = (startTime, endTime, noLunchBreak, settings) => {
+  // 現場設定を優先、なければ会社設定を使用
+  const calcWorkHours = (startTime, endTime, noLunchBreak, siteId, sitesMap, defaultSettings) => {
     if (!startTime || !endTime) return 0;
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
+
+    // 現場設定を優先、なければ会社設定
+    const siteSettings = sitesMap[siteId]?.lunchBreakSettings;
+    const settings = siteSettings || defaultSettings;
+    const deductLunchBreak = settings?.deductLunchBreak !== false;
+    const lunchBreakMinutes = settings?.lunchBreakMinutes || 60;
+
     let lunchMinutes = 0;
-    if (!noLunchBreak && settings.deductLunchBreak) {
-      lunchMinutes = settings.lunchBreakMinutes || 60;
+    if (!noLunchBreak && deductLunchBreak) {
+      lunchMinutes = lunchBreakMinutes;
     }
     return Math.max(0, (totalMinutes - lunchMinutes) / 60);
   };
@@ -52,11 +61,19 @@ export default function AttendanceSummary() {
         // 会社設定取得
         const companyDoc = await getDoc(doc(db, 'companies', companyId));
         const companyData = companyDoc.data();
-        const settings = {
+        const defaultSettings = {
           deductLunchBreak: companyData?.attendanceSettings?.deductLunchBreak !== false,
           lunchBreakMinutes: companyData?.attendanceSettings?.lunchBreakMinutes ?? 60,
         };
-        setAttendanceSettings(settings);
+        setCompanySettings(defaultSettings);
+
+        // 現場データ取得（昼休憩設定を含む）
+        const sitesSnap = await getDocs(collection(db, 'companies', companyId, 'sites'));
+        const sitesMap = {};
+        sitesSnap.docs.forEach(d => {
+          sitesMap[d.id] = d.data();
+        });
+        setSites(sitesMap);
 
         // 従業員取得
         const empSnap = await getDocs(
@@ -110,7 +127,7 @@ export default function AttendanceSummary() {
             }
 
             summaryMap[key].dates.add(dateStr);
-            summaryMap[key].totalHours += calcWorkHours(worker.startTime, worker.endTime, worker.noLunchBreak, settings);
+            summaryMap[key].totalHours += calcWorkHours(worker.startTime, worker.endTime, worker.noLunchBreak, report.siteId, sitesMap, defaultSettings);
             if (worker.noLunchBreak) {
               summaryMap[key].noLunchDays += 1;
             }
@@ -188,10 +205,8 @@ export default function AttendanceSummary() {
 
       <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600">
         <span className="font-medium">稼働時間の計算: </span>
-        {attendanceSettings.deductLunchBreak
-          ? `昼休憩あり → ${attendanceSettings.lunchBreakMinutes}分を控除 / 昼休憩なし → 控除なし`
-          : '昼休憩の有無に関わらず控除なし（全時間を稼働時間に算入）'}
-        <span className="text-gray-400 ml-2">（自社情報設定 → 勤怠設定で変更可能）</span>
+        各現場の昼休憩設定に基づいて計算されます。
+        <span className="text-gray-400 ml-2">（現場管理 → 各現場の昼休憩設定で変更可能）</span>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
