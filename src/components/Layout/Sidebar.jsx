@@ -67,7 +67,7 @@ const menuItems = [
     label: '勤怠集計',
     category: '集計',
     adminOnly: false,
-    hidden: false
+    hidden: true
   },
   { 
     id: 'contracts', 
