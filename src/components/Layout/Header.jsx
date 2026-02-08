@@ -69,9 +69,17 @@ export default function Header({ onMenuClick }) {
               <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-800 font-medium">
                 管理者
               </span>
-            ) : (
+            ) : userInfo?.role === 'office' || userInfo?.role === 'manager' ? (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-800 font-medium">
+                事務員
+              </span>
+            ) : userInfo?.role === 'site_manager' ? (
               <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800 font-medium">
-                オペレーター
+                現場管理者
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800 font-medium">
+                作業員
               </span>
             )}
           </div>

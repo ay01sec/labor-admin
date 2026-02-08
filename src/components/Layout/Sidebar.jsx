@@ -210,7 +210,9 @@ export default function Sidebar({ isOpen, setIsOpen, onNavigate }) {
                 {userInfo?.displayName || 'ユーザー'}
               </p>
               <p className="text-xs text-gray-400">
-                {userInfo?.role === 'admin' ? '管理者' : userInfo?.role === 'manager' ? 'マネージャー' : 'ワーカー'}
+                {userInfo?.role === 'admin' ? '管理者' :
+                 userInfo?.role === 'office' || userInfo?.role === 'manager' ? '事務員' :
+                 userInfo?.role === 'site_manager' ? '現場管理者' : '作業員'}
               </p>
             </div>
           )}
