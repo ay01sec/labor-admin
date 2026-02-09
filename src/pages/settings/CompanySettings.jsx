@@ -48,9 +48,6 @@ const CARD_BRAND_LABELS = {
 
 // PAY.JP カード入力コンポーネント（3Dセキュア対応）
 function PayjpCardForm({ companyId, onSuccess, onError }) {
-  const cardNumberRef = useRef(null);
-  const cardExpiryRef = useRef(null);
-  const cardCvcRef = useRef(null);
   const payjpRef = useRef(null);
   const cardNumberElementRef = useRef(null);
   const cardExpiryElementRef = useRef(null);
@@ -65,7 +62,7 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   useEffect(() => {
     let timer;
     let attempts = 0;
-    const maxAttempts = 20;
+    const maxAttempts = 30;
 
     const initPayjp = () => {
       attempts++;
@@ -73,15 +70,19 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       // PAY.JP SDKの読み込みを待つ
       if (!window.Payjp) {
         if (attempts < maxAttempts) {
-          timer = setTimeout(initPayjp, 100);
+          timer = setTimeout(initPayjp, 200);
         }
         return;
       }
 
-      // DOM要素の準備を待つ
-      if (!cardNumberRef.current || !cardExpiryRef.current || !cardCvcRef.current) {
+      // DOM要素をIDで取得
+      const cardNumberEl = document.getElementById('payjp-card-number');
+      const cardExpiryEl = document.getElementById('payjp-card-expiry');
+      const cardCvcEl = document.getElementById('payjp-card-cvc');
+
+      if (!cardNumberEl || !cardExpiryEl || !cardCvcEl) {
         if (attempts < maxAttempts) {
-          timer = setTimeout(initPayjp, 100);
+          timer = setTimeout(initPayjp, 200);
         }
         return;
       }
@@ -109,9 +110,9 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
         const cardExpiry = elements.create('cardExpiry', { style });
         const cardCvc = elements.create('cardCvc', { style });
 
-        cardNumber.mount(cardNumberRef.current);
-        cardExpiry.mount(cardExpiryRef.current);
-        cardCvc.mount(cardCvcRef.current);
+        cardNumber.mount('#payjp-card-number');
+        cardExpiry.mount('#payjp-card-expiry');
+        cardCvc.mount('#payjp-card-cvc');
 
         cardNumberElementRef.current = cardNumber;
         cardExpiryElementRef.current = cardExpiry;
@@ -129,7 +130,7 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
     };
 
     if (PAYJP_PUBLIC_KEY) {
-      timer = setTimeout(initPayjp, 100);
+      timer = setTimeout(initPayjp, 200);
     }
 
     return () => {
@@ -229,16 +230,16 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
-        <div ref={cardNumberRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+        <div id="payjp-card-number" className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">有効期限</label>
-          <div ref={cardExpiryRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+          <div id="payjp-card-expiry" className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">CVC</label>
-          <div ref={cardCvcRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+          <div id="payjp-card-cvc" className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
         </div>
       </div>
       {cardError && (
