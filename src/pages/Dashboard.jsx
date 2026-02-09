@@ -199,10 +199,14 @@ export default function Dashboard() {
           .slice(0, 5);
         setRecentReports(reports);
 
-        // お知らせ（仮のデータ）
-        setNotifications([
-          { id: 1, message: '承認待ちの日報が' + pendingReportsSnap.size + '件あります', type: 'warning' },
-        ]);
+        // お知らせ
+        const notificationList = [
+          { id: 1, message: '4月1日 iPhone用日報アプリリリース予定', type: 'info' },
+        ];
+        if (pendingReportsSnap.size > 0) {
+          notificationList.push({ id: 2, message: '承認待ちの日報が' + pendingReportsSnap.size + '件あります', type: 'warning' });
+        }
+        setNotifications(notificationList);
 
       } catch (error) {
         console.error('データ取得エラー:', error);
