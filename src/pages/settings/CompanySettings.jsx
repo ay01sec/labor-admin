@@ -91,8 +91,10 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       if (cardNumberElementRef.current) return;
 
       try {
-        // 3Dセキュアは一旦無効（テスト用）
-        const payjp = window.Payjp(PAYJP_PUBLIC_KEY);
+        // 3Dセキュア有効（iframe方式）
+        const payjp = window.Payjp(PAYJP_PUBLIC_KEY, {
+          threeDSecureWorkflow: 'iframe'
+        });
         payjpRef.current = payjp;
         const elements = payjp.elements();
 
@@ -152,9 +154,13 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   const handleCardSubmit = async () => {
     if (!payjpRef.current || !cardNumberElementRef.current) return;
 
-    // カード名義のバリデーション
+    // 3Dセキュア用のバリデーション
     if (!cardName.trim()) {
       setCardError('カード名義を入力してください');
+      return;
+    }
+    if (!cardEmail.trim()) {
+      setCardError('メールアドレスを入力してください');
       return;
     }
 
@@ -162,10 +168,12 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
     setCardError('');
 
     try {
-      // 1. PAY.JPトークン作成（3Dセキュアは一旦無効）
+      // 1. PAY.JPトークン作成（3Dセキュア認証付き）
       const response = await payjpRef.current.createToken(cardNumberElementRef.current, {
+        three_d_secure: true,
         card: {
           name: cardName.trim(),
+          email: cardEmail.trim(),
         },
       });
 
@@ -207,10 +215,10 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
         />
         <p className="text-xs text-gray-500 mt-1">カードに記載されている名義を半角英字で入力</p>
       </div>
-      {/* メールアドレス（任意） */}
+      {/* 3Dセキュア用: メールアドレス */}
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">
-          メールアドレス（任意）
+          メールアドレス <span className="text-red-500">*</span>
         </label>
         <input
           type="email"
@@ -219,7 +227,7 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
           placeholder="example@email.com"
           className="w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
-        <p className="text-xs text-gray-500 mt-1">領収書などの送信に使用します</p>
+        <p className="text-xs text-gray-500 mt-1">3Dセキュア認証に使用します</p>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
@@ -240,7 +248,8 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       )}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-xs text-blue-700">
-          <strong>セキュリティ:</strong> カード情報はPAY.JPのセキュアなサーバーで処理され、当サービスには保存されません。
+          <strong>3Dセキュア認証について:</strong> カード登録時に本人認証（3Dセキュア）が行われます。
+          カード発行会社の認証画面が表示される場合があります。
         </p>
       </div>
       <button
