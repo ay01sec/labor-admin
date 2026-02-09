@@ -56,12 +56,20 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState('');
   const [ready, setReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
   // 3Dセキュア用の追加フィールド
   const [cardName, setCardName] = useState('');
   const [cardEmail, setCardEmail] = useState('');
 
+  // コンポーネントがマウントされたことを検知
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (!PAYJP_PUBLIC_KEY || !window.Payjp) return;
+    if (!cardNumberRef.current || !cardExpiryRef.current || !cardCvcRef.current) return;
 
     // 3Dセキュア対応: iframe ワークフローを指定
     const payjp = window.Payjp(PAYJP_PUBLIC_KEY, {
@@ -100,7 +108,7 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       cardExpiry.unmount();
       cardCvc.unmount();
     };
-  }, []);
+  }, [mounted]);
 
   const handleCardSubmit = async () => {
     if (!payjpRef.current || !cardNumberElementRef.current) return;
