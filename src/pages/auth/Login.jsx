@@ -483,10 +483,9 @@ export default function Login() {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         {/* ロゴ・タイトル */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-500 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl shadow-lg">
-            🏗️
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <img src="/logo-with-text.png" alt="CONSTRUCTION DX SYSTEM" className="h-20 object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">労務管理システム</h1>
           <p className="text-gray-500 mt-2">管理画面にログイン</p>
         </div>
 

@@ -141,8 +141,8 @@ export default function Sidebar({ isOpen, setIsOpen, onNavigate }) {
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between">
           <div className={`flex items-center space-x-3 ${!isOpen && 'justify-center w-full'}`}>
-            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-              🏗️
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <img src="/logo-icon.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             {isOpen && (
               <div className="overflow-hidden">
