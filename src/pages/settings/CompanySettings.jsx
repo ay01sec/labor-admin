@@ -63,59 +63,87 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   const [cardEmail, setCardEmail] = useState('');
 
   useEffect(() => {
-    if (!PAYJP_PUBLIC_KEY || !window.Payjp) return;
+    let timer;
+    let attempts = 0;
+    const maxAttempts = 20;
 
-    // DOMが準備されるまで少し待つ
-    const timer = setTimeout(() => {
-      if (!cardNumberRef.current || !cardExpiryRef.current || !cardCvcRef.current) return;
-      if (cardNumberElementRef.current) return; // 既に初期化済み
+    const initPayjp = () => {
+      attempts++;
 
-      const payjp = window.Payjp(PAYJP_PUBLIC_KEY, {
-        threeDSecureWorkflow: 'iframe'
-      });
-      payjpRef.current = payjp;
-      const elements = payjp.elements();
+      // PAY.JP SDKの読み込みを待つ
+      if (!window.Payjp) {
+        if (attempts < maxAttempts) {
+          timer = setTimeout(initPayjp, 100);
+        }
+        return;
+      }
 
-      const style = {
-        base: {
-          color: '#32325d',
-          fontSize: '16px',
-          '::placeholder': { color: '#aab7c4' },
-        },
-        invalid: { color: '#e25950' },
-      };
+      // DOM要素の準備を待つ
+      if (!cardNumberRef.current || !cardExpiryRef.current || !cardCvcRef.current) {
+        if (attempts < maxAttempts) {
+          timer = setTimeout(initPayjp, 100);
+        }
+        return;
+      }
 
-      const cardNumber = elements.create('cardNumber', { style });
-      const cardExpiry = elements.create('cardExpiry', { style });
-      const cardCvc = elements.create('cardCvc', { style });
+      // 既に初期化済みならスキップ
+      if (cardNumberElementRef.current) return;
 
-      cardNumber.mount(cardNumberRef.current);
-      cardExpiry.mount(cardExpiryRef.current);
-      cardCvc.mount(cardCvcRef.current);
+      try {
+        const payjp = window.Payjp(PAYJP_PUBLIC_KEY, {
+          threeDSecureWorkflow: 'iframe'
+        });
+        payjpRef.current = payjp;
+        const elements = payjp.elements();
 
-      cardNumberElementRef.current = cardNumber;
-      cardExpiryElementRef.current = cardExpiry;
-      cardCvcElementRef.current = cardCvc;
-      setReady(true);
+        const style = {
+          base: {
+            color: '#32325d',
+            fontSize: '16px',
+            '::placeholder': { color: '#aab7c4' },
+          },
+          invalid: { color: '#e25950' },
+        };
 
-      cardNumber.on('change', (event) => {
-        if (event.error) setCardError(event.error.message);
-        else setCardError('');
-      });
-    }, 100);
+        const cardNumber = elements.create('cardNumber', { style });
+        const cardExpiry = elements.create('cardExpiry', { style });
+        const cardCvc = elements.create('cardCvc', { style });
+
+        cardNumber.mount(cardNumberRef.current);
+        cardExpiry.mount(cardExpiryRef.current);
+        cardCvc.mount(cardCvcRef.current);
+
+        cardNumberElementRef.current = cardNumber;
+        cardExpiryElementRef.current = cardExpiry;
+        cardCvcElementRef.current = cardCvc;
+        setReady(true);
+
+        cardNumber.on('change', (event) => {
+          if (event.error) setCardError(event.error.message);
+          else setCardError('');
+        });
+      } catch (err) {
+        console.error('PAY.JP初期化エラー:', err);
+        setCardError('カードフォームの初期化に失敗しました');
+      }
+    };
+
+    if (PAYJP_PUBLIC_KEY) {
+      timer = setTimeout(initPayjp, 100);
+    }
 
     return () => {
       clearTimeout(timer);
       if (cardNumberElementRef.current) {
-        cardNumberElementRef.current.unmount();
+        try { cardNumberElementRef.current.unmount(); } catch (e) {}
         cardNumberElementRef.current = null;
       }
       if (cardExpiryElementRef.current) {
-        cardExpiryElementRef.current.unmount();
+        try { cardExpiryElementRef.current.unmount(); } catch (e) {}
         cardExpiryElementRef.current = null;
       }
       if (cardCvcElementRef.current) {
-        cardCvcElementRef.current.unmount();
+        try { cardCvcElementRef.current.unmount(); } catch (e) {}
         cardCvcElementRef.current = null;
       }
     };
@@ -1740,7 +1768,7 @@ export default function CompanySettings() {
                 {selectedPaymentMethod === 'card' && isAdmin() && (
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-4">カード情報の入力</h3>
-                    {PAYJP_PUBLIC_KEY && window.Payjp ? (
+                    {PAYJP_PUBLIC_KEY ? (
                       <PayjpCardForm
                         companyId={companyId}
                         onSuccess={handleCardSuccess}
