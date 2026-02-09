@@ -15,7 +15,7 @@
     }
   ],
   "hosting": {
-    "site": "labor-admin-20260202",
+    "site": "labormanagement-20260202",
     "public": "dist",
     "ignore": [
       "firebase.json",
