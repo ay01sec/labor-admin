@@ -48,67 +48,97 @@ const CARD_BRAND_LABELS = {
 
 // PAY.JP カード入力コンポーネント（3Dセキュア対応）
 function PayjpCardForm({ companyId, onSuccess, onError }) {
-  const cardNumberRef = useRef(null);
-  const cardExpiryRef = useRef(null);
-  const cardCvcRef = useRef(null);
   const payjpRef = useRef(null);
   const cardNumberElementRef = useRef(null);
+  const cardExpiryElementRef = useRef(null);
+  const cardCvcElementRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState('');
   const [ready, setReady] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   // 3Dセキュア用の追加フィールド
   const [cardName, setCardName] = useState('');
   const [cardEmail, setCardEmail] = useState('');
 
-  // コンポーネントがマウントされたことを検知
+  // PAY.JP初期化（一度だけ）
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (!PAYJP_PUBLIC_KEY || !window.Payjp || initialized) return;
 
-  useEffect(() => {
-    if (!mounted) return;
-    if (!PAYJP_PUBLIC_KEY || !window.Payjp) return;
-    if (!cardNumberRef.current || !cardExpiryRef.current || !cardCvcRef.current) return;
-
-    // 3Dセキュア対応: iframe ワークフローを指定
     const payjp = window.Payjp(PAYJP_PUBLIC_KEY, {
       threeDSecureWorkflow: 'iframe'
     });
     payjpRef.current = payjp;
-    const elements = payjp.elements();
+    setInitialized(true);
+  }, [initialized]);
 
-    const style = {
-      base: {
-        color: '#32325d',
-        fontSize: '16px',
-        '::placeholder': { color: '#aab7c4' },
-      },
-      invalid: { color: '#e25950' },
-    };
+  // カード番号フィールド用のコールバックref
+  const cardNumberRefCallback = useCallback((node) => {
+    if (node && payjpRef.current && !cardNumberElementRef.current) {
+      const elements = payjpRef.current.elements();
+      const style = {
+        base: {
+          color: '#32325d',
+          fontSize: '16px',
+          '::placeholder': { color: '#aab7c4' },
+        },
+        invalid: { color: '#e25950' },
+      };
+      const cardNumber = elements.create('cardNumber', { style });
+      cardNumber.mount(node);
+      cardNumberElementRef.current = cardNumber;
 
-    const cardNumber = elements.create('cardNumber', { style });
-    const cardExpiry = elements.create('cardExpiry', { style });
-    const cardCvc = elements.create('cardCvc', { style });
+      cardNumber.on('change', (event) => {
+        if (event.error) setCardError(event.error.message);
+        else setCardError('');
+      });
+    }
+  }, [initialized]);
 
-    cardNumber.mount(cardNumberRef.current);
-    cardExpiry.mount(cardExpiryRef.current);
-    cardCvc.mount(cardCvcRef.current);
+  // 有効期限フィールド用のコールバックref
+  const cardExpiryRefCallback = useCallback((node) => {
+    if (node && payjpRef.current && !cardExpiryElementRef.current) {
+      const elements = payjpRef.current.elements();
+      const style = {
+        base: {
+          color: '#32325d',
+          fontSize: '16px',
+          '::placeholder': { color: '#aab7c4' },
+        },
+        invalid: { color: '#e25950' },
+      };
+      const cardExpiry = elements.create('cardExpiry', { style });
+      cardExpiry.mount(node);
+      cardExpiryElementRef.current = cardExpiry;
+    }
+  }, [initialized]);
 
-    cardNumberElementRef.current = cardNumber;
-    setReady(true);
+  // CVCフィールド用のコールバックref
+  const cardCvcRefCallback = useCallback((node) => {
+    if (node && payjpRef.current && !cardCvcElementRef.current) {
+      const elements = payjpRef.current.elements();
+      const style = {
+        base: {
+          color: '#32325d',
+          fontSize: '16px',
+          '::placeholder': { color: '#aab7c4' },
+        },
+        invalid: { color: '#e25950' },
+      };
+      const cardCvc = elements.create('cardCvc', { style });
+      cardCvc.mount(node);
+      cardCvcElementRef.current = cardCvc;
+      setReady(true);
+    }
+  }, [initialized]);
 
-    cardNumber.on('change', (event) => {
-      if (event.error) setCardError(event.error.message);
-      else setCardError('');
-    });
-
+  // クリーンアップ
+  useEffect(() => {
     return () => {
-      cardNumber.unmount();
-      cardExpiry.unmount();
-      cardCvc.unmount();
+      if (cardNumberElementRef.current) cardNumberElementRef.current.unmount();
+      if (cardExpiryElementRef.current) cardExpiryElementRef.current.unmount();
+      if (cardCvcElementRef.current) cardCvcElementRef.current.unmount();
     };
-  }, [mounted]);
+  }, []);
 
   const handleCardSubmit = async () => {
     if (!payjpRef.current || !cardNumberElementRef.current) return;
@@ -190,16 +220,16 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
-        <div ref={cardNumberRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+        <div ref={cardNumberRefCallback} className="border border-gray-300 rounded-lg p-3 bg-white" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">有効期限</label>
-          <div ref={cardExpiryRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+          <div ref={cardExpiryRefCallback} className="border border-gray-300 rounded-lg p-3 bg-white" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">CVC</label>
-          <div ref={cardCvcRef} className="border border-gray-300 rounded-lg p-3 bg-white" />
+          <div ref={cardCvcRefCallback} className="border border-gray-300 rounded-lg p-3 bg-white" />
         </div>
       </div>
       {cardError && (
