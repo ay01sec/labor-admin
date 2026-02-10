@@ -2207,3 +2207,278 @@ exports.sendTestNotification = onCall(
     }
   }
 );
+
+/**
+ * 日報手動承認（権限チェック付き）
+ */
+exports.approveReport = onCall(
+  { region: "asia-northeast1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, reportId } = request.data;
+    if (!companyId || !reportId) {
+      throw new HttpsError("invalid-argument", "companyIdとreportIdは必須です");
+    }
+
+    try {
+      // 権限チェック
+      const userDoc = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!userDoc.exists) {
+        throw new HttpsError("permission-denied", "ユーザーが見つかりません");
+      }
+
+      const userData = userDoc.data();
+      if (!["admin", "office", "manager"].includes(userData.role)) {
+        throw new HttpsError("permission-denied", "事務員以上の権限が必要です");
+      }
+
+      // 日報のステータス確認
+      const reportRef = db
+        .collection("companies")
+        .doc(companyId)
+        .collection("dailyReports")
+        .doc(reportId);
+      const reportSnap = await reportRef.get();
+
+      if (!reportSnap.exists) {
+        throw new HttpsError("not-found", "日報が見つかりません");
+      }
+
+      const reportData = reportSnap.data();
+      if (reportData.status !== "submitted") {
+        throw new HttpsError("failed-precondition", "送信完了の日報のみ承認できます");
+      }
+
+      // 承認を実行
+      await reportRef.update({
+        status: "approved",
+        "approval.approvedBy": request.auth.uid,
+        "approval.approvedByName": userData.displayName || userData.email || "",
+        "approval.approvedAt": Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      console.log(`日報承認成功: ${reportId} by ${userData.displayName || userData.email}`);
+
+      return { success: true };
+    } catch (error) {
+      console.error("日報承認エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "承認に失敗しました");
+    }
+  }
+);
+
+/**
+ * 日報差戻し（権限チェック付き）
+ */
+exports.rejectReport = onCall(
+  { region: "asia-northeast1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, reportId, reason } = request.data;
+    if (!companyId || !reportId) {
+      throw new HttpsError("invalid-argument", "companyIdとreportIdは必須です");
+    }
+
+    try {
+      // 権限チェック
+      const userDoc = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!userDoc.exists) {
+        throw new HttpsError("permission-denied", "ユーザーが見つかりません");
+      }
+
+      const userData = userDoc.data();
+      if (!["admin", "office", "manager"].includes(userData.role)) {
+        throw new HttpsError("permission-denied", "事務員以上の権限が必要です");
+      }
+
+      // 日報のステータス確認
+      const reportRef = db
+        .collection("companies")
+        .doc(companyId)
+        .collection("dailyReports")
+        .doc(reportId);
+      const reportSnap = await reportRef.get();
+
+      if (!reportSnap.exists) {
+        throw new HttpsError("not-found", "日報が見つかりません");
+      }
+
+      const reportData = reportSnap.data();
+      if (!["submitted", "approved"].includes(reportData.status)) {
+        throw new HttpsError("failed-precondition", "送信完了または承認済みの日報のみ差戻しできます");
+      }
+
+      // 差戻しを実行（署名もクリア）
+      await reportRef.update({
+        status: "rejected",
+        "rejection.rejectedBy": request.auth.uid,
+        "rejection.rejectedByName": userData.displayName || userData.email || "",
+        "rejection.rejectedAt": Timestamp.now(),
+        "rejection.reason": reason || "",
+        // 署名をクリア（再署名が必要）
+        "clientSignature.imageUrl": null,
+        "clientSignature.signedAt": null,
+        "clientSignature.signerName": null,
+        updatedAt: Timestamp.now(),
+      });
+
+      console.log(`日報差戻し成功: ${reportId} by ${userData.displayName || userData.email}`);
+
+      return { success: true };
+    } catch (error) {
+      console.error("日報差戻しエラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "差戻しに失敗しました");
+    }
+  }
+);
+
+/**
+ * 署名データ移行スクリプト（管理者のみ実行可能）
+ * 古いパス形式の署名を新しい統一パス形式に移行
+ */
+exports.migrateSignatureData = onCall(
+  { region: "asia-northeast1", timeoutSeconds: 540 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, dryRun = true } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    try {
+      // 管理者権限チェック
+      const userDoc = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(request.auth.uid)
+        .get();
+
+      if (!userDoc.exists || userDoc.data().role !== "admin") {
+        throw new HttpsError("permission-denied", "管理者権限が必要です");
+      }
+
+      // 全日報を取得
+      const reportsSnapshot = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("dailyReports")
+        .get();
+
+      const results = {
+        total: reportsSnapshot.size,
+        needsMigration: 0,
+        migrated: 0,
+        skipped: 0,
+        errors: [],
+      };
+
+      for (const reportDoc of reportsSnapshot.docs) {
+        const reportData = reportDoc.data();
+        const imageUrl = reportData.clientSignature?.imageUrl;
+
+        if (!imageUrl) {
+          results.skipped++;
+          continue;
+        }
+
+        // 新しいパス形式かどうかをチェック
+        // 新パス: companies/{companyId}/dailyReports/{reportId}/signatures/
+        // 旧パス1: signatures/{companyId}/{reportId}/
+        // 旧パス2: companies/{companyId}/reports/{reportId}/photos/signature_
+        const isNewFormat = imageUrl.includes(`/dailyReports/${reportDoc.id}/signatures/`);
+
+        if (isNewFormat) {
+          results.skipped++;
+          continue;
+        }
+
+        results.needsMigration++;
+
+        if (dryRun) {
+          console.log(`[DRY RUN] 移行対象: ${reportDoc.id} - ${imageUrl}`);
+          continue;
+        }
+
+        try {
+          // 古いファイルをダウンロード
+          const oldUrl = new URL(imageUrl);
+          const oldPath = decodeURIComponent(oldUrl.pathname.split("/o/")[1]?.split("?")[0] || "");
+
+          if (!oldPath) {
+            results.errors.push({ reportId: reportDoc.id, error: "パス解析失敗" });
+            continue;
+          }
+
+          const oldFile = bucket.file(oldPath);
+          const [exists] = await oldFile.exists();
+
+          if (!exists) {
+            results.errors.push({ reportId: reportDoc.id, error: "元ファイルが存在しない" });
+            continue;
+          }
+
+          // 新しいパスにコピー
+          const timestamp = Date.now();
+          const newPath = `companies/${companyId}/dailyReports/${reportDoc.id}/signatures/${timestamp}.png`;
+          const newFile = bucket.file(newPath);
+
+          await oldFile.copy(newFile);
+
+          // 新しいURLを取得
+          const [newUrl] = await newFile.getSignedUrl({
+            action: "read",
+            expires: "03-01-2500",
+          });
+
+          // Firestore更新
+          await reportDoc.ref.update({
+            "clientSignature.imageUrl": newUrl,
+            "clientSignature.migratedAt": Timestamp.now(),
+            "clientSignature.oldImageUrl": imageUrl,
+          });
+
+          // 古いファイルを削除（オプション：コメントアウト）
+          // await oldFile.delete();
+
+          results.migrated++;
+          console.log(`移行成功: ${reportDoc.id}`);
+        } catch (migrateError) {
+          results.errors.push({ reportId: reportDoc.id, error: migrateError.message });
+          console.error(`移行失敗: ${reportDoc.id}`, migrateError);
+        }
+      }
+
+      console.log("移行結果:", results);
+      return results;
+    } catch (error) {
+      console.error("署名データ移行エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "移行に失敗しました");
+    }
+  }
+);

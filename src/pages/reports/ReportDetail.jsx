@@ -111,19 +111,18 @@ export default function ReportDetail() {
     return format(date, 'yyyy年M月d日 HH:mm', { locale: ja });
   };
 
-  // 承認処理
+  // 承認処理（Cloud Function経由で権限チェック）
   const handleApprove = async () => {
     if (!confirm('この日報を承認しますか？')) return;
 
     setProcessing(true);
     try {
-      const reportRef = doc(db, 'companies', companyId, 'dailyReports', id);
-      await updateDoc(reportRef, {
-        status: 'approved',
-        'approval.approvedBy': currentUser.uid,
-        'approval.approvedByName': userInfo?.displayName || userInfo?.email || '',
-        'approval.approvedAt': serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const functions = getFunctions(undefined, 'asia-northeast1');
+      const approveReportFn = httpsCallable(functions, 'approveReport');
+
+      await approveReportFn({
+        companyId,
+        reportId: id,
       });
 
       setReport((prev) => ({
@@ -139,13 +138,18 @@ export default function ReportDetail() {
       toast.success('日報を承認しました');
     } catch (error) {
       console.error('承認エラー:', error);
-      toast.error('承認に失敗しました');
+      const errorMessage = error.message || '承認に失敗しました';
+      if (errorMessage.includes('permission-denied')) {
+        toast.error('承認する権限がありません');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setProcessing(false);
     }
   };
 
-  // 差戻し処理
+  // 差戻し処理（Cloud Function経由で権限チェック）
   const handleReject = async () => {
     if (!rejectReason.trim()) {
       toast.error('差戻し理由を入力してください');
@@ -154,18 +158,13 @@ export default function ReportDetail() {
 
     setProcessing(true);
     try {
-      const reportRef = doc(db, 'companies', companyId, 'dailyReports', id);
-      await updateDoc(reportRef, {
-        status: 'rejected',
-        'rejection.rejectedBy': currentUser.uid,
-        'rejection.rejectedByName': userInfo?.displayName || userInfo?.email || '',
-        'rejection.rejectedAt': serverTimestamp(),
-        'rejection.reason': rejectReason,
-        // 署名をクリア（再署名が必要）
-        'clientSignature.imageUrl': null,
-        'clientSignature.signedAt': null,
-        'clientSignature.signerName': null,
-        updatedAt: serverTimestamp(),
+      const functions = getFunctions(undefined, 'asia-northeast1');
+      const rejectReportFn = httpsCallable(functions, 'rejectReport');
+
+      await rejectReportFn({
+        companyId,
+        reportId: id,
+        reason: rejectReason,
       });
 
       setReport((prev) => ({
@@ -189,7 +188,12 @@ export default function ReportDetail() {
       toast.success('日報を差戻しました');
     } catch (error) {
       console.error('差戻しエラー:', error);
-      toast.error('差戻しに失敗しました');
+      const errorMessage = error.message || '差戻しに失敗しました';
+      if (errorMessage.includes('permission-denied')) {
+        toast.error('差戻しする権限がありません');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setProcessing(false);
     }
@@ -207,8 +211,11 @@ export default function ReportDetail() {
     return null;
   }
 
-  const canApprove = report.status === 'submitted';
-  const canEdit = isOfficeOrAbove && isOfficeOrAbove() && ['approved', 'submitted'].includes(report.status);
+  // 承認・編集権限のチェック（事務員以上）
+  const hasApprovalPermission = isOfficeOrAbove && isOfficeOrAbove();
+  const canApprove = hasApprovalPermission && report.status === 'submitted';
+  const canReject = hasApprovalPermission && ['submitted', 'approved'].includes(report.status);
+  const canEdit = hasApprovalPermission && ['approved', 'submitted'].includes(report.status);
 
   // 編集モーダルを開く
   const openEditModal = () => {
