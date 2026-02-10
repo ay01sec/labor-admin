@@ -1853,12 +1853,17 @@ exports.scheduledNotifications = onSchedule(
           .where("isActive", "==", true)
           .get();
 
+        // 日報を提出する権限を持つロール（現場管理者以上）
+        const reportingRoles = ["site_manager", "office", "manager", "admin"];
+
         for (const userDoc of usersSnapshot.docs) {
           const userData = userDoc.data();
           const userId = userDoc.id;
           const fcmToken = userData.fcmToken;
 
           if (!fcmToken) continue;
+          // 日報提出対象のロールのみ
+          if (!reportingRoles.includes(userData.role)) continue;
 
           // このユーザーの今日の日報をチェック（サブコレクション）
           const reportsSnapshot = await db
@@ -2033,7 +2038,8 @@ exports.customNotifications = onSchedule(
         }
 
         const companyId = notification.companyId;
-        const targetRoles = notification.targetRoles || ["user", "manager", "admin"];
+        // site_managerを含むデフォルトロール
+        const targetRoles = notification.targetRoles || ["site_manager", "office", "manager", "admin"];
 
         // 対象ユーザーを取得
         const usersQuery = db

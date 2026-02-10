@@ -52,7 +52,7 @@ export default function NotificationSettings() {
     message: '',
     repeat: 'daily',
     customDays: [],
-    targetRoles: ['user', 'manager'],
+    targetRoles: ['site_manager', 'office', 'admin'],
     enabled: true,
   });
 
@@ -99,7 +99,7 @@ export default function NotificationSettings() {
       message: '',
       repeat: 'daily',
       customDays: [],
-      targetRoles: ['user', 'manager'],
+      targetRoles: ['site_manager', 'office', 'admin'],
       enabled: true,
     });
     setEditingId(null);
@@ -119,7 +119,7 @@ export default function NotificationSettings() {
       message: notification.message || '',
       repeat: notification.repeat || 'daily',
       customDays: notification.customDays || [],
-      targetRoles: notification.targetRoles || ['user', 'manager'],
+      targetRoles: notification.targetRoles || ['site_manager', 'office', 'admin'],
       enabled: notification.enabled !== false,
     });
     setEditingId(notification.id);
