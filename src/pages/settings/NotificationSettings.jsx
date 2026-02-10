@@ -13,7 +13,8 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { db, functions } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 import {
   ArrowLeft,
   Bell,
@@ -23,6 +24,7 @@ import {
   X,
   Save,
   AlertCircle,
+  Send,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -55,6 +57,45 @@ export default function NotificationSettings() {
     targetRoles: ['site_manager', 'office', 'admin'],
     enabled: true,
   });
+
+  const [sendingTest, setSendingTest] = useState(false);
+
+  // テスト通知を送信
+  const handleSendTestNotification = async () => {
+    if (sendingTest) return;
+
+    setSendingTest(true);
+    try {
+      const sendTestNotification = httpsCallable(functions, 'sendTestNotification');
+      const result = await sendTestNotification({
+        companyId,
+        message: 'テスト通知です。この通知が届いていれば、プッシュ通知は正常に動作しています。',
+      });
+
+      const { results } = result.data;
+      const successCount = results.filter((r) => r.success).length;
+      const failCount = results.filter((r) => !r.success).length;
+
+      if (successCount > 0) {
+        toast.success(`${successCount}人に通知を送信しました`);
+      }
+      if (failCount > 0) {
+        const failedUsers = results
+          .filter((r) => !r.success)
+          .map((r) => `${r.displayName}: ${r.error}`)
+          .join('\n');
+        toast.error(`${failCount}人への送信に失敗:\n${failedUsers}`, { duration: 5000 });
+      }
+      if (results.length === 0) {
+        toast.error('送信対象のユーザーがいません');
+      }
+    } catch (error) {
+      console.error('テスト通知エラー:', error);
+      toast.error('テスト通知の送信に失敗しました');
+    } finally {
+      setSendingTest(false);
+    }
+  };
 
   // データ取得
   useEffect(() => {
@@ -246,13 +287,23 @@ export default function NotificationSettings() {
           </h1>
         </div>
         {isAdmin() && (
-          <button
-            onClick={openNewModal}
-            className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={20} />
-            <span>新規追加</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleSendTestNotification}
+              disabled={sendingTest}
+              className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <Send size={20} />
+              <span>{sendingTest ? '送信中...' : 'テスト通知'}</span>
+            </button>
+            <button
+              onClick={openNewModal}
+              className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={20} />
+              <span>新規追加</span>
+            </button>
+          </div>
         )}
       </div>
 

@@ -2092,3 +2092,118 @@ exports.customNotifications = onSchedule(
     }
   }
 );
+
+/**
+ * テスト通知を即座に送信（デバッグ用）
+ */
+exports.sendTestNotification = onCall(
+  {
+    region: "asia-northeast1",
+  },
+  async (request) => {
+    const { companyId, userId, message } = request.data;
+
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    const results = [];
+    const notificationMessage = message || "これはテスト通知です";
+
+    try {
+      let usersQuery = db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .where("isActive", "==", true);
+
+      const usersSnapshot = await usersQuery.get();
+
+      console.log(`テスト通知: ${usersSnapshot.size}人のユーザーを取得`);
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userData = userDoc.data();
+        const userIdCurrent = userDoc.id;
+
+        // 特定のユーザーが指定されている場合はそのユーザーのみ
+        if (userId && userIdCurrent !== userId) {
+          continue;
+        }
+
+        const fcmToken = userData.fcmToken;
+        const displayName = userData.displayName || "不明";
+
+        if (!fcmToken) {
+          results.push({
+            userId: userIdCurrent,
+            displayName,
+            success: false,
+            error: "FCMトークンが未設定",
+          });
+          console.log(`テスト通知: ${displayName} - FCMトークンなし`);
+          continue;
+        }
+
+        try {
+          await messaging.send({
+            token: fcmToken,
+            notification: {
+              title: "作業日報アプリ -CDS- (テスト)",
+              body: notificationMessage,
+            },
+            data: {
+              type: "test",
+            },
+            android: {
+              priority: "high",
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: "default",
+                },
+              },
+            },
+          });
+
+          results.push({
+            userId: userIdCurrent,
+            displayName,
+            success: true,
+          });
+          console.log(`テスト通知送信成功: ${displayName}`);
+        } catch (sendError) {
+          results.push({
+            userId: userIdCurrent,
+            displayName,
+            success: false,
+            error: sendError.message,
+          });
+          console.error(`テスト通知送信失敗: ${displayName}`, sendError.message);
+
+          // 無効なトークンの場合はFirestoreから削除
+          if (
+            sendError.code === "messaging/invalid-registration-token" ||
+            sendError.code === "messaging/registration-token-not-registered"
+          ) {
+            await db
+              .collection("companies")
+              .doc(companyId)
+              .collection("users")
+              .doc(userIdCurrent)
+              .update({
+                fcmToken: FieldValue.delete(),
+                fcmTokenUpdatedAt: FieldValue.delete(),
+              });
+            console.log(`無効なFCMトークンを削除: ${displayName}`);
+          }
+        }
+      }
+
+      return { results };
+    } catch (error) {
+      console.error("テスト通知処理エラー:", error);
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
