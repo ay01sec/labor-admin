@@ -126,7 +126,8 @@
           <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 写真を最大3枚添付（現場状況を記録）</li>
           <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> スマホ上で得意先の電子署名を取得</li>
           <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> プッシュ通知で却下・承認をリアルタイム通知</li>
-          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> ホーム画面追加でネイティブアプリのように使える</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> オフラインでも下書き保存・オンライン復帰時に自動同期</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> iOS/Androidネイティブアプリ対応</li>
         </ul>
       </div>
       <!-- 労務管理 -->
@@ -135,11 +136,12 @@
         <h3 class="text-xl font-bold mb-2">労務管理システム <span class="text-sm font-normal text-gray-500">（管理者向け）</span></h3>
         <p class="text-gray-600 text-sm mb-4">日報承認・勤怠集計・社員マスタ管理を一画面で完結するWebダッシュボード。</p>
         <ul class="space-y-2 text-sm text-gray-700">
-          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 日報のワンクリック承認・却下（理由入力付き）</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 日報の承認・却下（自動承認モードも選択可能）</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 承認済み日報のPDF・QRコード自動生成</li>
           <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 勤怠の月別自動集計（昼休憩控除対応）</li>
-          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> CSV / PDFの一括エクスポート</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> カスタム通知（現場別リマインダー設定）</li>
+          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> CSV / PDFの一括インポート・エクスポート</li>
           <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> 社員・取引先・現場のマスタ一元管理</li>
-          <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">&#10003;</span> ロール別の権限管理（管理者/マネージャー）</li>
         </ul>
       </div>
     </div>
@@ -178,6 +180,16 @@
         <h4 class="font-bold mb-1">CSV / PDF出力</h4>
         <p class="text-sm text-gray-600">日報や勤怠データをCSV・PDFで一括出力。既存の給与ソフトとの連携も容易です。</p>
       </div>
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#9889;</div>
+        <h4 class="font-bold mb-1">自動承認モード</h4>
+        <p class="text-sm text-gray-600">日報提出時に自動承認。PDF・QRコードを即座に生成し、指定メールに自動送信します。</p>
+      </div>
+      <div class="bg-white border rounded-xl p-6 card-hover">
+        <div class="text-3xl mb-3">&#128241;</div>
+        <h4 class="font-bold mb-1">オフライン対応</h4>
+        <p class="text-sm text-gray-600">電波の届かない現場でも下書き保存。オンライン復帰時に自動同期されます。</p>
+      </div>
     </div>
   </section>
 
@@ -198,15 +210,15 @@
       <div class="flex items-start gap-5">
         <div class="number-circle bg-blue-600 text-white">2</div>
         <div>
-          <h4 class="font-bold text-lg">管理画面で承認</h4>
-          <p class="text-sm text-gray-600 mt-1">事務所の管理者がPCで日報を確認し、ワンクリックで承認または却下。却下理由も記録でき、作業員に自動通知されます。</p>
+          <h4 class="font-bold text-lg">承認（自動/手動）</h4>
+          <p class="text-sm text-gray-600 mt-1">手動承認モードでは管理者がPCで確認。自動承認モードでは提出と同時に承認完了。却下時は理由と共に作業員へ自動通知されます。</p>
         </div>
       </div>
       <div class="flex items-start gap-5">
         <div class="number-circle bg-blue-600 text-white">3</div>
         <div>
-          <h4 class="font-bold text-lg">自動集計 &amp; エクスポート</h4>
-          <p class="text-sm text-gray-600 mt-1">承認済み日報から勤怠が自動集計。月末のCSV・PDF一括出力で、給与計算や元請提出書類をすぐに作成できます。</p>
+          <h4 class="font-bold text-lg">PDF・QR生成 &amp; 自動集計</h4>
+          <p class="text-sm text-gray-600 mt-1">承認と同時にPDF・QRコードを自動生成。勤怠は月別に自動集計され、給与計算や元請提出書類をすぐに作成できます。</p>
         </div>
       </div>
     </div>
@@ -248,6 +260,11 @@
             <td class="py-3 px-4 text-center text-gray-500">メール / USB</td>
             <td class="py-3 px-4 text-center font-semibold text-blue-700">日報に直接添付</td>
           </tr>
+          <tr class="bg-gray-50">
+            <td class="py-3 px-4 font-medium">元請への提出</td>
+            <td class="py-3 px-4 text-center text-gray-500">印刷・FAX</td>
+            <td class="py-3 px-4 text-center font-semibold text-blue-700">QRコード / PDF自動送信</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -265,7 +282,14 @@
           アプリのインストールは必要ですか？
           <span class="text-blue-500 group-open:rotate-180 transition-transform text-xl">&#9660;</span>
         </summary>
-        <p class="text-sm text-gray-600 mt-3">いいえ。PWA（Progressive Web App）のため、ブラウザからアクセスするだけで利用可能です。ホーム画面に追加すれば、ネイティブアプリのように使えます。</p>
+        <p class="text-sm text-gray-600 mt-3">ブラウザからアクセスするだけで利用可能です（PWA対応）。また、App StoreやGoogle Playからネイティブアプリもダウンロードできます。</p>
+      </details>
+      <details class="bg-white rounded-lg shadow-sm p-5 group">
+        <summary class="font-semibold cursor-pointer list-none flex justify-between items-center">
+          電波の届かない現場でも使えますか？
+          <span class="text-blue-500 group-open:rotate-180 transition-transform text-xl">&#9660;</span>
+        </summary>
+        <p class="text-sm text-gray-600 mt-3">はい。オフライン時も下書き保存が可能で、オンラインに復帰すると自動的に同期されます。山間部やトンネル工事現場でも安心してお使いいただけます。</p>
       </details>
       <details class="bg-white rounded-lg shadow-sm p-5 group">
         <summary class="font-semibold cursor-pointer list-none flex justify-between items-center">

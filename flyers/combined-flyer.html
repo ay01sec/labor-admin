@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>建設業DXソリューション 両面チラシ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+    width: 210mm;
+    margin: 0 auto;
+    background: #fff;
+    color: #1a1a2e;
+  }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+  .page {
+    width: 210mm;
+    height: 297mm;
+    background: #fff;
+    position: relative;
+    page-break-after: always;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ========================================
+     表面（1ページ目）
+     ======================================== */
+  .front-header {
+    background: linear-gradient(135deg, #1a2f4a 0%, #2d5a87 100%);
+    color: #fff;
+    padding: 18px 36px;
+  }
+  .front-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .front-header h1 {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+  .front-header h1 .accent { color: #7ec8e3; }
+  .front-header-sub {
+    font-size: 13px;
+    margin-top: 8px;
+    opacity: 0.85;
+  }
+
+  .front-main { flex: 1; display: flex; flex-direction: column; }
+
+  .front-catch {
+    text-align: center;
+    padding: 18px 36px;
+  }
+  .front-catch h2 {
+    font-size: 19px;
+    color: #1a2f4a;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .front-catch h2 em {
+    font-style: normal;
+    border-bottom: 2px solid #3a7bd5;
+  }
+
+  .two-systems {
+    display: flex;
+    gap: 14px;
+    padding: 0 36px 16px;
+  }
+  .system-card {
+    flex: 1;
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .system-card.admin {
+    background: #f8fafd;
+    border: 1px solid #d0dff0;
+  }
+  .system-card.report {
+    background: #f5faf7;
+    border: 1px solid #c8e6d0;
+  }
+  .system-card .sys-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .system-card.admin .sys-badge { background: #1a2f4a; color: #fff; }
+  .system-card.report .sys-badge { background: #0d6b3d; color: #fff; }
+  .system-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .system-card.admin h3 { color: #1a2f4a; }
+  .system-card.report h3 { color: #0d6b3d; }
+  .system-card > p { font-size: 11px; color: #555; line-height: 1.4; margin-bottom: 10px; }
+  .system-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .system-features span {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .system-card.admin .system-features span { background: #e8f0fe; color: #1a2f4a; }
+  .system-card.report .system-features span { background: #e8f5ed; color: #0d6b3d; }
+  .system-features span i { font-size: 10px; }
+
+  .integration {
+    background: #f8f9fc;
+    padding: 16px 36px;
+    border-top: 1px solid #e8ecf0;
+    border-bottom: 1px solid #e8ecf0;
+  }
+  .section-title {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a2f4a;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .section-title::before,
+  .section-title::after {
+    content: '';
+    width: 30px;
+    height: 1px;
+    background: #c8d4e0;
+  }
+  .integration-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .int-step {
+    text-align: center;
+    padding: 12px 14px;
+    border-radius: 6px;
+    min-width: 90px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .int-step .int-icon {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  .int-step.worker .int-icon { color: #0d6b3d; }
+  .int-step.cloud .int-icon { color: #6b4fa0; }
+  .int-step.office .int-icon { color: #1a2f4a; }
+  .int-step .int-label { font-size: 11px; font-weight: 700; color: #333; }
+  .int-step .int-who {
+    font-size: 8px;
+    margin-top: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    color: #fff;
+  }
+  .int-step.worker .int-who { background: #0d6b3d; }
+  .int-step.cloud .int-who { background: #6b4fa0; }
+  .int-step.office .int-who { background: #1a2f4a; }
+  .int-arrow { font-size: 14px; color: #c8d4e0; }
+
+  .front-benefits {
+    display: flex;
+    gap: 12px;
+    padding: 16px 36px;
+  }
+  .front-benefit {
+    flex: 1;
+    text-align: center;
+    background: linear-gradient(135deg, #1a2f4a, #2d5a87);
+    color: #fff;
+    border-radius: 6px;
+    padding: 16px 10px;
+  }
+  .front-benefit .big-num { font-size: 32px; font-weight: 800; color: #7ec8e3; }
+  .front-benefit .big-num span { font-size: 12px; font-weight: 600; }
+  .front-benefit p { font-size: 11px; margin-top: 3px; opacity: 0.9; }
+
+  .front-sales {
+    background: #1a2f4a;
+    padding: 16px 36px;
+    text-align: center;
+  }
+  .front-sales h3 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .front-sales > p { font-size: 11px; color: rgba(255,255,255,0.85); line-height: 1.5; }
+  .front-sales .highlight {
+    display: inline-block;
+    background: #7ec8e3;
+    color: #1a2f4a;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+
+  .front-footer {
+    background: #f8f9fc;
+    padding: 10px 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #e8ecf0;
+  }
+  .front-footer-left h4 { font-size: 9px; font-weight: 700; color: #1a2f4a; margin-bottom: 2px; }
+  .front-footer-left p { font-size: 7px; color: #666; }
+  .front-footer-center { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .qr-placeholder { width: 46px; height: 46px; background: #fff; border: 1px solid #e0e8f0; border-radius: 4px; }
+  .qr-label { font-size: 7px; font-weight: 600; color: #1a2f4a; }
+  .front-footer-right { text-align: right; }
+  .front-footer-right .cta {
+    display: inline-block;
+    background: #1a2f4a;
+    color: #fff;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 5px 12px;
+    border-radius: 4px;
+  }
+  .front-footer-right p { font-size: 7px; color: #666; margin-top: 2px; }
+
+  /* ========================================
+     裏面（2ページ目）
+     ======================================== */
+  .back-header {
+    background: linear-gradient(135deg, #1a2f4a, #2d5a87);
+    color: #fff;
+    padding: 10px 36px;
+    text-align: center;
+  }
+  .back-header h2 { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
+
+  .back-main { flex: 1; display: flex; flex-direction: column; }
+
+  .detail-section { padding: 16px 36px; }
+  .detail-section.admin-detail { background: #fff; }
+  .detail-section.report-detail { background: #fafcfa; }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .detail-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #fff;
+  }
+  .admin-detail .detail-icon { background: linear-gradient(135deg, #1a2f4a, #3a7bd5); }
+  .report-detail .detail-icon { background: linear-gradient(135deg, #0d6b3d, #27ae60); }
+  .detail-title h3 { font-size: 14px; font-weight: 700; }
+  .admin-detail .detail-title h3 { color: #1a2f4a; }
+  .report-detail .detail-title h3 { color: #0d6b3d; }
+  .detail-title p { font-size: 9px; color: #666; }
+
+  .detail-features {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .detail-feature {
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: 6px;
+    background: #fff;
+  }
+  .admin-detail .detail-feature { border: 1px solid #d0dff0; }
+  .report-detail .detail-feature { border: 1px solid #c8e6d0; }
+  .detail-feature .df-icon { font-size: 20px; margin-bottom: 6px; }
+  .admin-detail .detail-feature .df-icon { color: #3a7bd5; }
+  .report-detail .detail-feature .df-icon { color: #27ae60; }
+  .detail-feature p { font-size: 10px; font-weight: 700; }
+  .admin-detail .detail-feature p { color: #1a2f4a; }
+  .report-detail .detail-feature p { color: #0d6b3d; }
+  .detail-feature .df-desc { font-size: 8px; color: #666; margin-top: 3px; }
+
+  .synergy-section {
+    padding: 14px 36px;
+    background: #fff;
+    border-top: 1px solid #e8ecf0;
+  }
+  .synergy-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .synergy-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: #f8f9fc;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .synergy-icon {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #1a2f4a, #3a7bd5);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .synergy-item h4 { font-size: 11px; font-weight: 700; color: #1a2f4a; margin-bottom: 2px; }
+  .synergy-item p { font-size: 9px; color: #666; line-height: 1.4; }
+
+  .problems-section {
+    padding: 14px 36px;
+    background: #f8f9fc;
+    border-top: 1px solid #e8ecf0;
+  }
+  .problems { display: flex; gap: 12px; }
+  .problem-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 6px;
+    padding: 12px 10px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .problem-card .icon {
+    width: 34px;
+    height: 34px;
+    margin: 0 auto 8px;
+    background: #eef3f9;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3a7bd5;
+    font-size: 14px;
+  }
+  .problem-card p { font-size: 10px; color: #444; font-weight: 600; line-height: 1.4; }
+
+  .back-footer {
+    background: #f8f9fc;
+    padding: 10px 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #e8ecf0;
+  }
+  .back-footer-left h4 { font-size: 9px; font-weight: 700; color: #1a2f4a; margin-bottom: 2px; }
+  .back-footer-left p { font-size: 7px; color: #666; }
+  .back-footer-center { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .back-footer-right { text-align: right; }
+  .back-footer-right .cta {
+    display: inline-block;
+    background: #1a2f4a;
+    color: #fff;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 5px 12px;
+    border-radius: 4px;
+  }
+  .back-footer-right p { font-size: 7px; color: #666; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- 表面（1ページ目） -->
+<div class="page">
+  <div class="front-header">
+    <div class="front-badge">CONSTRUCTION DX</div>
+    <h1>建設業の<span class="accent">労務管理</span>を<br>まるごとデジタル化</h1>
+    <p class="front-header-sub">現場と事務所をつなぐ、クラウド型業務改善ソリューション</p>
+  </div>
+
+  <div class="front-main">
+    <div class="front-catch">
+      <h2><em>紙・Excel・FAX</em>から卒業。<br>2つのシステムで業務を一元管理。</h2>
+    </div>
+
+    <div class="two-systems">
+      <div class="system-card admin">
+        <div class="sys-badge">FOR OFFICE</div>
+        <h3>労務管理システム</h3>
+        <p>社員・取引先・現場・日報・勤怠を<br>ダッシュボードで一元管理</p>
+        <div class="system-features">
+          <span><i class="fa-solid fa-bolt"></i> 自動/手動承認</span>
+          <span><i class="fa-solid fa-qrcode"></i> PDF/QR生成</span>
+          <span><i class="fa-solid fa-bell"></i> カスタム通知</span>
+          <span><i class="fa-solid fa-calculator"></i> 勤怠集計</span>
+        </div>
+      </div>
+      <div class="system-card report">
+        <div class="sys-badge">FOR FIELD</div>
+        <h3>作業日報アプリ</h3>
+        <p>スマホから日報作成・署名取得・<br>写真添付・提出まで完結</p>
+        <div class="system-features">
+          <span><i class="fa-solid fa-signature"></i> 電子署名</span>
+          <span><i class="fa-solid fa-image"></i> 写真添付</span>
+          <span><i class="fa-solid fa-wifi-slash"></i> オフライン対応</span>
+          <span><i class="fa-solid fa-mobile-screen"></i> ネイティブアプリ</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="integration">
+      <h3 class="section-title">現場と事務所のシームレスな連携</h3>
+      <div class="integration-flow">
+        <div class="int-step worker">
+          <i class="fa-solid fa-mobile-screen-button int-icon"></i>
+          <div class="int-label">日報作成・署名</div>
+          <div class="int-who">現場</div>
+        </div>
+        <i class="fa-solid fa-chevron-right int-arrow"></i>
+        <div class="int-step cloud">
+          <i class="fa-solid fa-bolt int-icon"></i>
+          <div class="int-label">自動/手動承認</div>
+          <div class="int-who">システム/管理者</div>
+        </div>
+        <i class="fa-solid fa-chevron-right int-arrow"></i>
+        <div class="int-step cloud">
+          <i class="fa-solid fa-qrcode int-icon"></i>
+          <div class="int-label">PDF/QR生成</div>
+          <div class="int-who">自動</div>
+        </div>
+        <i class="fa-solid fa-chevron-right int-arrow"></i>
+        <div class="int-step office">
+          <i class="fa-solid fa-envelope int-icon"></i>
+          <div class="int-label">メール送信</div>
+          <div class="int-who">自動</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="front-benefits">
+      <div class="front-benefit">
+        <div class="big-num">80<span>%</span></div>
+        <p>事務作業を削減</p>
+      </div>
+      <div class="front-benefit">
+        <div class="big-num">0<span>円</span></div>
+        <p>紙・印刷コスト</p>
+      </div>
+      <div class="front-benefit">
+        <div class="big-num">24<span>h</span></div>
+        <p>いつでもアクセス</p>
+      </div>
+    </div>
+
+    <div class="front-sales">
+      <h3>まずは無料でお試しください</h3>
+      <p>導入前のご相談から、運用開始後のサポートまで<br>お客様の業務改善を全力でサポートいたします。</p>
+      <div class="highlight">初期費用0円・1ヶ月無料トライアル実施中</div>
+    </div>
+  </div>
+
+  <div class="front-footer">
+    <div class="front-footer-left">
+      <h4>アースプラン株式会社 × 業務改善屋さん 共同開発</h4>
+      <p>建設業向け 労務管理DXソリューション</p>
+    </div>
+    <div class="front-footer-center">
+      <img src="qrcode.png" class="qr-placeholder" alt="利用登録QRコード">
+      <div class="qr-label">利用登録はこちら</div>
+    </div>
+    <div class="front-footer-right">
+      <div class="cta">お問い合わせ</div>
+      <p>y_akagi@improve-biz.com</p>
+    </div>
+  </div>
+</div>
+
+<!-- 裏面（2ページ目） -->
+<div class="page">
+  <div class="back-header">
+    <h2>システム詳細</h2>
+  </div>
+
+  <div class="back-main">
+    <div class="detail-section admin-detail">
+      <div class="detail-header">
+        <div class="detail-icon"><i class="fa-solid fa-desktop"></i></div>
+        <div class="detail-title">
+          <h3>労務管理システム</h3>
+          <p>事務所向け ｜ PC・タブレット対応 ｜ クラウド型</p>
+        </div>
+      </div>
+      <div class="detail-features">
+        <div class="detail-feature">
+          <i class="fa-solid fa-bolt df-icon"></i>
+          <p>自動/手動承認</p>
+          <div class="df-desc">現場別に承認モード設定可</div>
+        </div>
+        <div class="detail-feature">
+          <i class="fa-solid fa-qrcode df-icon"></i>
+          <p>PDF/QR生成</p>
+          <div class="df-desc">承認と同時に自動生成</div>
+        </div>
+        <div class="detail-feature">
+          <i class="fa-solid fa-bell df-icon"></i>
+          <p>カスタム通知</p>
+          <div class="df-desc">現場別リマインダー設定</div>
+        </div>
+        <div class="detail-feature">
+          <i class="fa-solid fa-calculator df-icon"></i>
+          <p>勤怠集計</p>
+          <div class="df-desc">昼休憩控除対応・CSV出力</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section report-detail">
+      <div class="detail-header">
+        <div class="detail-icon"><i class="fa-solid fa-mobile-screen"></i></div>
+        <div class="detail-title">
+          <h3>作業日報アプリ</h3>
+          <p>現場向け ｜ PWA / iOS / Android 対応</p>
+        </div>
+      </div>
+      <div class="detail-features">
+        <div class="detail-feature">
+          <i class="fa-solid fa-signature df-icon"></i>
+          <p>電子署名</p>
+          <div class="df-desc">元請先の署名をその場で取得</div>
+        </div>
+        <div class="detail-feature">
+          <i class="fa-solid fa-image df-icon"></i>
+          <p>写真添付</p>
+          <div class="df-desc">現場写真を最大3枚添付</div>
+        </div>
+        <div class="detail-feature">
+          <i class="fa-solid fa-wifi-slash df-icon"></i>
+          <p>オフライン対応</p>
+          <div class="df-desc">電波なしでも下書き保存</div>
+        </div>
+        <div class="detail-feature">
+          <i class="fa-solid fa-qrcode df-icon"></i>
+          <p>QR確認</p>
+          <div class="df-desc">承認後すぐにQRコード表示</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="synergy-section">
+      <h3 class="section-title">2つのシステムの連携メリット</h3>
+      <div class="synergy-grid">
+        <div class="synergy-item">
+          <div class="synergy-icon"><i class="fa-solid fa-bolt"></i></div>
+          <div>
+            <h4>自動承認でスピードアップ</h4>
+            <p>提出と同時にPDF・QR生成。元請へのメール送信も自動化。</p>
+          </div>
+        </div>
+        <div class="synergy-item">
+          <div class="synergy-icon"><i class="fa-solid fa-chart-simple"></i></div>
+          <div>
+            <h4>自動勤怠集計</h4>
+            <p>日報データから労働時間を自動計算。Excel集計が不要に。</p>
+          </div>
+        </div>
+        <div class="synergy-item">
+          <div class="synergy-icon"><i class="fa-solid fa-bell"></i></div>
+          <div>
+            <h4>カスタム通知</h4>
+            <p>現場別にリマインダーを設定。提出忘れを自動で防止。</p>
+          </div>
+        </div>
+        <div class="synergy-item">
+          <div class="synergy-icon"><i class="fa-solid fa-wifi-slash"></i></div>
+          <div>
+            <h4>オフライン対応</h4>
+            <p>電波の届かない現場でも下書き保存。復帰時に自動同期。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="problems-section">
+      <h3 class="section-title">こんな課題を解決します</h3>
+      <div class="problems">
+        <div class="problem-card">
+          <div class="icon"><i class="fa-solid fa-file-lines"></i></div>
+          <p>日報が紙ベースで<br>集計が大変</p>
+        </div>
+        <div class="problem-card">
+          <div class="icon"><i class="fa-solid fa-clock"></i></div>
+          <p>勤怠集計を<br>手作業で対応</p>
+        </div>
+        <div class="problem-card">
+          <div class="icon"><i class="fa-solid fa-folder-open"></i></div>
+          <p>情報が<br>バラバラに管理</p>
+        </div>
+        <div class="problem-card">
+          <div class="icon"><i class="fa-solid fa-mobile-screen"></i></div>
+          <p>外出先から<br>確認できない</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="back-footer">
+    <div class="back-footer-left">
+      <h4>アースプラン株式会社 × 業務改善屋さん 共同開発</h4>
+      <p>建設業向け 労務管理DXソリューション ｜ クラウド型</p>
+    </div>
+    <div class="back-footer-center">
+      <img src="qrcode.png" class="qr-placeholder" alt="利用登録QRコード">
+      <div class="qr-label">利用登録はこちら</div>
+    </div>
+    <div class="back-footer-right">
+      <div class="cta">お問い合わせ</div>
+      <p>y_akagi@improve-biz.com</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

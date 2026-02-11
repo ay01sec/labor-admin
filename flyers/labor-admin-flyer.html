@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>労務管理システム チラシ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+    width: 210mm; height: 297mm;
+    margin: 0 auto;
+    background: #fff;
+    color: #1a1a2e;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+  /* ── ヘッダー ── */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    color: #fff;
+    padding: 20px 36px 24px;
+    position: relative;
+  }
+  .header-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    line-height: 1.3;
+  }
+  .header h1 span { color: #7ec8e3; }
+  .header-sub {
+    font-size: 14px;
+    margin-top: 8px;
+    opacity: 0.9;
+    font-weight: 400;
+  }
+
+  /* ── メインコンテンツ ── */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  /* ── キャッチコピー ── */
+  .catch {
+    text-align: center;
+    padding: 16px 36px;
+    background: #fff;
+  }
+  .catch h2 {
+    font-size: 19px;
+    color: #1e3a5f;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .catch h2 em {
+    font-style: normal;
+    border-bottom: 3px solid #3a7bd5;
+    padding-bottom: 2px;
+  }
+
+  /* ── 課題セクション ── */
+  .problems-section {
+    background: #f8f9fc;
+    padding: 14px 36px;
+  }
+  .section-title {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e3a5f;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .section-title::before,
+  .section-title::after {
+    content: '';
+    width: 40px;
+    height: 1px;
+    background: #c0d0e0;
+  }
+  .problems {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+  }
+  .problem-card {
+    background: #fff;
+    border-radius: 6px;
+    padding: 12px 10px;
+    flex: 1;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .problem-card .icon {
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 6px;
+    background: #eef3f9;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3a7bd5;
+    font-size: 15px;
+  }
+  .problem-card p { font-size: 11px; color: #444; font-weight: 600; line-height: 1.4; }
+
+  /* ── 主な機能 ── */
+  .features-section {
+    padding: 14px 36px;
+    background: #fff;
+  }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .feature-item {
+    text-align: center;
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 6px;
+    padding: 12px 8px;
+  }
+  .feature-item .f-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 8px;
+    background: linear-gradient(135deg, #1e3a5f, #3a7bd5);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 17px;
+  }
+  .feature-item p { font-size: 11px; font-weight: 700; color: #1e3a5f; }
+
+  /* ── ワークフロー ── */
+  .workflow {
+    padding: 14px 36px;
+    background: #f8f9fc;
+  }
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .flow-step {
+    text-align: center;
+    background: #fff;
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-width: 85px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .flow-step .step-num {
+    display: inline-block;
+    background: #1e3a5f;
+    color: #fff;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    font-size: 10px;
+    line-height: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .flow-step .step-icon {
+    color: #3a7bd5;
+    font-size: 18px;
+    display: block;
+    margin: 4px 0;
+  }
+  .flow-step .step-label { font-size: 10px; font-weight: 700; color: #1e3a5f; }
+  .flow-step .step-who {
+    font-size: 8px;
+    color: #666;
+    background: #f0f4f8;
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-top: 4px;
+    display: inline-block;
+  }
+  .flow-arrow {
+    font-size: 14px;
+    color: #c0d0e0;
+  }
+
+  /* ── メリット ── */
+  .benefits {
+    display: flex;
+    gap: 12px;
+    padding: 14px 36px;
+    background: #fff;
+  }
+  .benefit {
+    flex: 1;
+    text-align: center;
+    background: linear-gradient(135deg, #1e3a5f, #2d5a87);
+    color: #fff;
+    border-radius: 6px;
+    padding: 14px 10px;
+  }
+  .benefit .big-num { font-size: 30px; font-weight: 800; color: #7ec8e3; }
+  .benefit .big-num span { font-size: 12px; font-weight: 600; }
+  .benefit p { font-size: 11px; margin-top: 2px; opacity: 0.9; font-weight: 500; }
+
+  /* ── セールス ── */
+  .sales {
+    background: #1e3a5f;
+    padding: 14px 36px;
+    text-align: center;
+  }
+  .sales h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .sales p {
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.5;
+  }
+  .sales .highlight {
+    display: inline-block;
+    background: #7ec8e3;
+    color: #1e3a5f;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+
+  /* ── フッター ── */
+  .footer {
+    background: #f8f9fc;
+    color: #1e3a5f;
+    padding: 12px 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #e0e8f0;
+  }
+  .footer-left h4 { font-size: 10px; font-weight: 700; margin-bottom: 2px; }
+  .footer-left p { font-size: 8px; color: #666; }
+  .footer-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .qr-placeholder {
+    width: 50px;
+    height: 50px;
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 4px;
+  }
+  .qr-label {
+    font-size: 8px;
+    font-weight: 600;
+    color: #1e3a5f;
+  }
+  .footer-right { text-align: right; }
+  .footer-right .cta {
+    display: inline-block;
+    background: #1e3a5f;
+    color: #fff;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 6px 16px;
+    border-radius: 4px;
+  }
+  .footer-right p { font-size: 8px; color: #666; margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-badge">CONSTRUCTION DX</div>
+  <h1>建設業向け<span>労務管理</span>システム</h1>
+  <p class="header-sub">社員・取引先・現場・日報・勤怠をワンストップで管理</p>
+</div>
+
+<div class="main-content">
+
+<div class="catch">
+  <h2><em>紙とExcelの管理</em>から卒業。<br>現場も事務所も、これ一つで完結。</h2>
+</div>
+
+<div class="problems-section">
+  <h3 class="section-title">こんな課題、ありませんか？</h3>
+  <div class="problems">
+    <div class="problem-card">
+      <div class="icon"><i class="fa-solid fa-file-lines"></i></div>
+      <p>日報が紙ベースで<br>集計が大変</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon"><i class="fa-solid fa-clock"></i></div>
+      <p>勤怠集計を<br>手作業で対応</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon"><i class="fa-solid fa-folder-open"></i></div>
+      <p>情報が<br>バラバラに管理</p>
+    </div>
+    <div class="problem-card">
+      <div class="icon"><i class="fa-solid fa-mobile-screen"></i></div>
+      <p>外出先から<br>確認できない</p>
+    </div>
+  </div>
+</div>
+
+<div class="features-section">
+  <h3 class="section-title">主な機能</h3>
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-chart-pie"></i></div>
+      <p>ダッシュボード</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-bolt"></i></div>
+      <p>自動/手動承認</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-qrcode"></i></div>
+      <p>PDF/QR生成</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-bell"></i></div>
+      <p>カスタム通知</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-building"></i></div>
+      <p>マスタ管理</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-calculator"></i></div>
+      <p>勤怠集計</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-file-import"></i></div>
+      <p>CSVインポート</p>
+    </div>
+    <div class="feature-item">
+      <div class="f-icon"><i class="fa-solid fa-file-export"></i></div>
+      <p>CSV/PDF出力</p>
+    </div>
+  </div>
+</div>
+
+<div class="workflow">
+  <h3 class="section-title">日報承認フロー</h3>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <i class="fa-solid fa-pen-to-square step-icon"></i>
+      <div class="step-label">日報入力</div>
+      <div class="step-who">作業員</div>
+    </div>
+    <i class="fa-solid fa-chevron-right flow-arrow"></i>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <i class="fa-solid fa-signature step-icon"></i>
+      <div class="step-label">電子署名</div>
+      <div class="step-who">元請先</div>
+    </div>
+    <i class="fa-solid fa-chevron-right flow-arrow"></i>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <i class="fa-solid fa-bolt step-icon"></i>
+      <div class="step-label">自動/手動承認</div>
+      <div class="step-who">システム/管理者</div>
+    </div>
+    <i class="fa-solid fa-chevron-right flow-arrow"></i>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <i class="fa-solid fa-qrcode step-icon"></i>
+      <div class="step-label">PDF/QR</div>
+      <div class="step-who">自動生成</div>
+    </div>
+  </div>
+</div>
+
+<div class="benefits">
+  <div class="benefit">
+    <div class="big-num">80<span>%</span></div>
+    <p>事務作業を削減</p>
+  </div>
+  <div class="benefit">
+    <div class="big-num">0<span>円</span></div>
+    <p>紙・印刷コスト</p>
+  </div>
+  <div class="benefit">
+    <div class="big-num">24<span>h</span></div>
+    <p>いつでもアクセス</p>
+  </div>
+</div>
+
+<div class="sales">
+  <h3>まずは無料でお試しください</h3>
+  <p>導入前のご相談から、運用開始後のサポートまで<br>お客様の業務改善を全力でサポートいたします。</p>
+  <div class="highlight">初期費用0円・1ヶ月無料トライアル実施中</div>
+</div>
+
+</div>
+
+<div class="footer">
+  <div class="footer-left">
+    <h4>アースプラン株式会社 × 業務改善屋さん 共同開発</h4>
+    <p>建設業向け 労務管理システム ｜ クラウド型 ｜ PC・タブレット対応</p>
+  </div>
+  <div class="footer-center">
+    <img src="qrcode.png" class="qr-placeholder" alt="利用登録QRコード">
+    <div class="qr-label">利用登録はこちら</div>
+  </div>
+  <div class="footer-right">
+    <div class="cta">お問い合わせ</div>
+    <p>y_akagi@improve-biz.com</p>
+  </div>
+</div>
+
+</body>
+</html>
