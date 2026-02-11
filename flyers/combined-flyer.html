@@ -387,6 +387,53 @@
   }
   .problem-card p { font-size: 10px; color: #444; font-weight: 600; line-height: 1.4; }
 
+  /* 導入の流れ */
+  .intro-flow-section {
+    padding: 18px 36px;
+    background: #fff;
+    border-top: 1px solid #e8ecf0;
+  }
+  .intro-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .intro-step {
+    text-align: center;
+    background: linear-gradient(135deg, #1a2f4a, #2d5a87);
+    color: #fff;
+    border-radius: 6px;
+    padding: 14px 16px;
+    min-width: 100px;
+  }
+  .intro-step .intro-num {
+    display: inline-block;
+    background: #7ec8e3;
+    color: #1a2f4a;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 11px;
+    line-height: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .intro-step .intro-icon {
+    font-size: 20px;
+    display: block;
+    margin: 6px 0;
+    color: #7ec8e3;
+  }
+  .intro-step .intro-label {
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .intro-arrow {
+    font-size: 16px;
+    color: #c8d4e0;
+  }
+
   .back-footer {
     background: #f8f9fc;
     padding: 16px 36px;
@@ -641,6 +688,35 @@
         <div class="problem-card">
           <div class="icon"><i class="fa-solid fa-mobile-screen"></i></div>
           <p>外出先から<br>確認できない</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="intro-flow-section">
+      <h3 class="section-title">導入の流れ</h3>
+      <div class="intro-steps">
+        <div class="intro-step">
+          <div class="intro-num">1</div>
+          <i class="fa-solid fa-comments intro-icon"></i>
+          <div class="intro-label">お問い合わせ</div>
+        </div>
+        <i class="fa-solid fa-chevron-right intro-arrow"></i>
+        <div class="intro-step">
+          <div class="intro-num">2</div>
+          <i class="fa-solid fa-user-check intro-icon"></i>
+          <div class="intro-label">無料トライアル</div>
+        </div>
+        <i class="fa-solid fa-chevron-right intro-arrow"></i>
+        <div class="intro-step">
+          <div class="intro-num">3</div>
+          <i class="fa-solid fa-file-contract intro-icon"></i>
+          <div class="intro-label">ご契約</div>
+        </div>
+        <i class="fa-solid fa-chevron-right intro-arrow"></i>
+        <div class="intro-step">
+          <div class="intro-num">4</div>
+          <i class="fa-solid fa-rocket intro-icon"></i>
+          <div class="intro-label">運用開始</div>
         </div>
       </div>
     </div>
