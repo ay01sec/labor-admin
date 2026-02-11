@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 
 // Layout
 import Layout from './components/Layout/Layout';
+import PublicLayout from './components/PublicLayout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -182,10 +183,11 @@ function AppRoutes() {
           <PrivateRoute skipMfaCheck><MfaSettings /></PrivateRoute>
         } />
 
-        {/* ヘルプ */}
-        <Route path="/help" element={<HelpPage />} />
+      </Route>
 
-        {/* 法務関連ページ */}
+      {/* 公開ページ（認証不要） */}
+      <Route element={<PublicLayout />}>
+        <Route path="/help" element={<HelpPage />} />
         <Route path="/legal/terms" element={<TermsOfService />} />
         <Route path="/legal/privacy" element={<PrivacyPolicy />} />
         <Route path="/legal/tokushoho" element={<Tokushoho />} />
