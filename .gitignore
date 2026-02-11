@@ -33,3 +33,9 @@ yarn-error.log*
 # Cache
 .cache/
 .parcel-cache/
+
+# E2E Tests
+.env.test
+e2e/.auth/
+playwright-report/
+test-results/
