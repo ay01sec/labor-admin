@@ -1782,7 +1782,17 @@ function isWithinTimeWindow(targetTime, currentTime, windowMinutes = 7) {
   const targetMinutes = targetHour * 60 + targetMin;
   const currentMinutes = currentHour * 60 + currentMin;
 
-  return Math.abs(targetMinutes - currentMinutes) <= windowMinutes;
+  // 通常の差分
+  let diff = Math.abs(targetMinutes - currentMinutes);
+
+  // 日付またぎを考慮（例: 23:55 と 00:02 の差は 7分）
+  const dayMinutes = 24 * 60;
+  const wrapAroundDiff = dayMinutes - diff;
+
+  // 通常の差分と日付またぎの差分の小さい方を使用
+  const actualDiff = Math.min(diff, wrapAroundDiff);
+
+  return actualDiff <= windowMinutes;
 }
 
 /**
@@ -1809,11 +1819,11 @@ function getTodayJST() {
 }
 
 /**
- * 日報未提出リマインダー（15分ごとに実行）
+ * 日報未提出リマインダー（1分ごとに実行）
  */
 exports.scheduledNotifications = onSchedule(
   {
-    schedule: "every 15 minutes",
+    schedule: "every 1 minutes",
     timeZone: "Asia/Tokyo",
     region: "asia-northeast1",
   },
@@ -1837,13 +1847,13 @@ exports.scheduledNotifications = onSchedule(
         // 企業の通知設定が無効な場合はスキップ
         if (!companyNotificationSettings?.enabled) continue;
 
-        // 現在時刻が通知時刻に該当するかチェック
+        // 現在時刻が通知時刻に該当するかチェック（完全一致）
         const reminderTimes = companyNotificationSettings.reminderTimes || [];
-        const shouldNotify = reminderTimes.some((time) =>
-          isWithinTimeWindow(time, currentTime)
-        );
+        const shouldNotify = reminderTimes.includes(currentTime);
 
         if (!shouldNotify) continue;
+
+        console.log(`企業 ${companyId}: リマインダー時刻一致 (${currentTime})`);
 
         // この企業のユーザーを取得
         const usersSnapshot = await db
@@ -1998,11 +2008,11 @@ exports.onReportRejected = onDocumentUpdated(
 );
 
 /**
- * カスタム通知（15分ごとに実行 - 日報リマインダーと同時に処理）
+ * カスタム通知（1分ごとに実行）
  */
 exports.customNotifications = onSchedule(
   {
-    schedule: "every 15 minutes",
+    schedule: "every 1 minutes",
     timeZone: "Asia/Tokyo",
     region: "asia-northeast1",
   },
@@ -2013,6 +2023,7 @@ exports.customNotifications = onSchedule(
     const utc = now.getTime() + now.getTimezoneOffset() * 60000;
     const jst = new Date(utc + jstOffset * 60000);
     const currentDayOfWeek = jst.getDay(); // 0=日, 1=月, ..., 6=土
+    const todayDateStr = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}-${String(jst.getDate()).padStart(2, "0")}`;
 
     console.log(`カスタム通知チェック開始: ${currentTime}, 曜日: ${currentDayOfWeek}`);
 
@@ -2023,39 +2034,111 @@ exports.customNotifications = onSchedule(
         .where("enabled", "==", true)
         .get();
 
+      console.log(`有効な通知設定: ${notificationsSnapshot.size}件`);
+
       for (const notificationDoc of notificationsSnapshot.docs) {
         const notification = notificationDoc.data();
+        const notificationId = notificationDoc.id;
 
-        // 時刻チェック
-        if (!isWithinTimeWindow(notification.time, currentTime)) continue;
-
-        // 曜日チェック
-        if (notification.repeat === "weekdays" && (currentDayOfWeek === 0 || currentDayOfWeek === 6)) {
+        // companyIdバリデーション
+        if (!notification.companyId) {
+          console.warn(`通知 ${notificationId}: companyIdが未設定のためスキップ`);
           continue;
         }
-        if (notification.repeat === "custom" && !notification.customDays?.includes(currentDayOfWeek)) {
+
+        // 時刻チェック（完全一致）
+        if (notification.time !== currentTime) {
+          continue;
+        }
+
+        console.log(`通知 ${notificationId}: 時刻一致 (${currentTime}), repeat=${notification.repeat}`);
+
+        // repeatのバリデーションと曜日チェック
+        const validRepeats = ["daily", "weekdays", "custom"];
+        if (!validRepeats.includes(notification.repeat)) {
+          console.warn(`通知 ${notificationId}: 不正なrepeat値 "${notification.repeat}" のためスキップ`);
+          continue;
+        }
+
+        if (notification.repeat === "weekdays" && (currentDayOfWeek === 0 || currentDayOfWeek === 6)) {
+          console.log(`通知 ${notificationId}: 平日のみ設定のため土日はスキップ`);
+          continue;
+        }
+        if (notification.repeat === "custom") {
+          if (!notification.customDays || !Array.isArray(notification.customDays) || notification.customDays.length === 0) {
+            console.warn(`通知 ${notificationId}: customDaysが未設定のためスキップ`);
+            continue;
+          }
+          if (!notification.customDays.includes(currentDayOfWeek)) {
+            console.log(`通知 ${notificationId}: 今日は対象曜日ではないためスキップ`);
+            continue;
+          }
+        }
+
+        // 送信済みチェック（同じ日に同じ通知を重複送信しない）
+        const sentLogRef = db.collection("customNotificationLogs").doc(`${notificationId}_${todayDateStr}`);
+        const sentLog = await sentLogRef.get();
+        if (sentLog.exists) {
+          console.log(`通知 ${notificationId}: 本日送信済みのためスキップ`);
           continue;
         }
 
         const companyId = notification.companyId;
-        // site_managerを含むデフォルトロール
-        const targetRoles = notification.targetRoles || ["site_manager", "office", "manager", "admin"];
+        // targetRolesのデフォルト値（管理画面と統一）
+        const targetRoles = notification.targetRoles || ["site_manager", "office", "admin"];
+
+        console.log(`通知 ${notificationId} (${notification.time}): 処理開始 - ${notification.message?.substring(0, 20)}...`);
 
         // 対象ユーザーを取得
-        const usersQuery = db
+        const usersSnapshot = await db
           .collection("companies")
           .doc(companyId)
           .collection("users")
-          .where("isActive", "==", true);
+          .where("isActive", "==", true)
+          .get();
 
-        const usersSnapshot = await usersQuery.get();
+        // siteIdフィルタリング用のユーザーセット
+        let targetUserIds = new Set(usersSnapshot.docs.map((doc) => doc.id));
+
+        // siteIdが指定されている場合、その現場で作業したことがあるユーザーのみに絞り込む
+        if (notification.siteId) {
+          const thirtyDaysAgo = new Date(jst.getTime() - 30 * 24 * 60 * 60 * 1000);
+          const reportsSnapshot = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("dailyReports")
+            .where("siteId", "==", notification.siteId)
+            .where("reportDate", ">=", Timestamp.fromDate(thirtyDaysAgo))
+            .get();
+
+          const siteUserIds = new Set(reportsSnapshot.docs.map((doc) => doc.data().createdBy));
+          targetUserIds = new Set([...targetUserIds].filter((id) => siteUserIds.has(id)));
+          console.log(`通知 ${notificationId}: 現場 ${notification.siteName || notification.siteId} の対象ユーザー: ${targetUserIds.size}人`);
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+        let skipCount = 0;
 
         for (const userDoc of usersSnapshot.docs) {
           const userData = userDoc.data();
+          const userId = userDoc.id;
           const fcmToken = userData.fcmToken;
 
-          if (!fcmToken) continue;
-          if (!targetRoles.includes(userData.role)) continue;
+          // siteIdフィルタリング
+          if (!targetUserIds.has(userId)) {
+            skipCount++;
+            continue;
+          }
+
+          if (!fcmToken) {
+            skipCount++;
+            continue;
+          }
+          if (!targetRoles.includes(userData.role)) {
+            skipCount++;
+            continue;
+          }
 
           try {
             await messaging.send({
@@ -2066,7 +2149,7 @@ exports.customNotifications = onSchedule(
               },
               data: {
                 type: "custom",
-                notificationId: notificationDoc.id,
+                notificationId: notificationId,
               },
               android: {
                 priority: "high",
@@ -2079,11 +2162,24 @@ exports.customNotifications = onSchedule(
                 },
               },
             });
-            console.log(`カスタム通知送信成功: ${userDoc.id}`);
+            successCount++;
           } catch (sendError) {
-            console.error(`カスタム通知送信失敗: ${userDoc.id}`, sendError);
+            console.error(`カスタム通知送信失敗: ${userId} (${userData.displayName || "不明"})`, sendError.message);
+            failCount++;
           }
         }
+
+        // 送信ログを記録（重複送信防止）
+        await sentLogRef.set({
+          notificationId,
+          companyId,
+          sentAt: FieldValue.serverTimestamp(),
+          successCount,
+          failCount,
+          skipCount,
+        });
+
+        console.log(`通知 ${notificationId}: 完了 - 成功: ${successCount}, 失敗: ${failCount}, スキップ: ${skipCount}`);
       }
 
       console.log("カスタム通知チェック完了");
@@ -2203,6 +2299,86 @@ exports.sendTestNotification = onCall(
       return { results };
     } catch (error) {
       console.error("テスト通知処理エラー:", error);
+      throw new HttpsError("internal", error.message);
+    }
+  }
+);
+
+/**
+ * カスタム通知の送信ログをクリア（管理者用）
+ */
+exports.clearNotificationLogs = onCall(
+  { region: "asia-northeast1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, notificationId, clearAll } = request.data;
+
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    // 管理者権限チェック
+    const userDoc = await db
+      .collection("companies")
+      .doc(companyId)
+      .collection("users")
+      .doc(request.auth.uid)
+      .get();
+
+    if (!userDoc.exists || userDoc.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "管理者権限が必要です");
+    }
+
+    try {
+      let deletedCount = 0;
+      const logsRef = db.collection("customNotificationLogs");
+
+      if (clearAll) {
+        // 全ての送信ログを削除
+        const allLogs = await logsRef.get();
+        const batch = db.batch();
+        allLogs.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+          deletedCount++;
+        });
+        await batch.commit();
+      } else if (notificationId) {
+        // 特定の通知IDの送信ログを削除
+        const logs = await logsRef
+          .where("notificationId", "==", notificationId)
+          .get();
+        const batch = db.batch();
+        logs.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+          deletedCount++;
+        });
+        await batch.commit();
+      } else {
+        // 今日の送信ログのみ削除
+        const now = new Date();
+        const jstOffset = 9 * 60;
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const jst = new Date(utc + jstOffset * 60000);
+        const todayDateStr = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}-${String(jst.getDate()).padStart(2, "0")}`;
+
+        const allLogs = await logsRef.get();
+        const batch = db.batch();
+        allLogs.docs.forEach((doc) => {
+          if (doc.id.endsWith(todayDateStr)) {
+            batch.delete(doc.ref);
+            deletedCount++;
+          }
+        });
+        await batch.commit();
+      }
+
+      console.log(`送信ログをクリア: ${deletedCount}件削除`);
+      return { success: true, deletedCount };
+    } catch (error) {
+      console.error("送信ログクリアエラー:", error);
       throw new HttpsError("internal", error.message);
     }
   }

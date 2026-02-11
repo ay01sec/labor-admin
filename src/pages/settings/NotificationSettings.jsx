@@ -25,6 +25,7 @@ import {
   Save,
   AlertCircle,
   Send,
+  RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -59,6 +60,28 @@ export default function NotificationSettings() {
   });
 
   const [sendingTest, setSendingTest] = useState(false);
+  const [clearingLogs, setClearingLogs] = useState(false);
+
+  // 送信ログをクリア
+  const handleClearLogs = async () => {
+    if (clearingLogs) return;
+
+    if (!confirm('本日の送信ログをクリアしますか？\nクリアすると、同じ通知を再度送信できるようになります。')) {
+      return;
+    }
+
+    setClearingLogs(true);
+    try {
+      const clearNotificationLogs = httpsCallable(functions, 'clearNotificationLogs');
+      const result = await clearNotificationLogs({ companyId });
+      toast.success(`送信ログを${result.data.deletedCount}件クリアしました`);
+    } catch (error) {
+      console.error('送信ログクリアエラー:', error);
+      toast.error('送信ログのクリアに失敗しました');
+    } finally {
+      setClearingLogs(false);
+    }
+  };
 
   // テスト通知を送信
   const handleSendTestNotification = async () => {
@@ -289,6 +312,15 @@ export default function NotificationSettings() {
         {isAdmin() && (
           <div className="flex items-center space-x-3">
             <button
+              onClick={handleClearLogs}
+              disabled={clearingLogs}
+              className="inline-flex items-center space-x-2 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
+              title="本日の送信ログをクリアして再送信可能にする"
+            >
+              <RotateCcw size={20} />
+              <span>{clearingLogs ? 'クリア中...' : 'ログクリア'}</span>
+            </button>
+            <button
               onClick={handleSendTestNotification}
               disabled={sendingTest}
               className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
@@ -315,8 +347,11 @@ export default function NotificationSettings() {
             <p className="font-medium">カスタム通知について</p>
             <p className="mt-1">
               任意のメッセージを指定した時刻にプッシュ通知として送信できます。
-              「全社共通」または「現場ごと」に設定可能です。
             </p>
+            <ul className="mt-2 list-disc list-inside space-y-1">
+              <li>「全社共通」：全ユーザーに送信</li>
+              <li>「現場指定」：過去30日間にその現場で日報を提出したユーザーのみに送信</li>
+            </ul>
           </div>
         </div>
       </div>
