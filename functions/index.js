@@ -1863,17 +1863,15 @@ exports.scheduledNotifications = onSchedule(
           .where("isActive", "==", true)
           .get();
 
-        // 日報を提出する権限を持つロール（現場管理者以上）
-        const reportingRoles = ["site_manager", "office", "manager", "admin"];
-
         for (const userDoc of usersSnapshot.docs) {
           const userData = userDoc.data();
           const userId = userDoc.id;
           const fcmToken = userData.fcmToken;
 
           if (!fcmToken) continue;
-          // 日報提出対象のロールのみ
-          if (!reportingRoles.includes(userData.role)) continue;
+
+          // ユーザーの通知設定をチェック（設定がない場合はデフォルトで受信）
+          if (userData.notifications?.dailyReminder === false) continue;
 
           // このユーザーの今日の日報をチェック（サブコレクション）
           const reportsSnapshot = await db
@@ -2023,7 +2021,6 @@ exports.customNotifications = onSchedule(
     const utc = now.getTime() + now.getTimezoneOffset() * 60000;
     const jst = new Date(utc + jstOffset * 60000);
     const currentDayOfWeek = jst.getDay(); // 0=日, 1=月, ..., 6=土
-    const todayDateStr = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}-${String(jst.getDate()).padStart(2, "0")}`;
 
     console.log(`カスタム通知チェック開始: ${currentTime}, 曜日: ${currentDayOfWeek}`);
 
@@ -2075,18 +2072,7 @@ exports.customNotifications = onSchedule(
           }
         }
 
-        // 送信済みチェック（同じ日に同じ通知を重複送信しない）
-        const sentLogRef = db.collection("customNotificationLogs").doc(`${notificationId}_${todayDateStr}`);
-        const sentLog = await sentLogRef.get();
-        if (sentLog.exists) {
-          console.log(`通知 ${notificationId}: 本日送信済みのためスキップ`);
-          continue;
-        }
-
         const companyId = notification.companyId;
-        // targetRolesのデフォルト値（管理画面と統一）
-        const targetRoles = notification.targetRoles || ["site_manager", "office", "admin"];
-
         console.log(`通知 ${notificationId} (${notification.time}): 処理開始 - ${notification.message?.substring(0, 20)}...`);
 
         // 対象ユーザーを取得
@@ -2124,18 +2110,24 @@ exports.customNotifications = onSchedule(
           const userData = userDoc.data();
           const userId = userDoc.id;
           const fcmToken = userData.fcmToken;
+          const displayName = userData.displayName || "不明";
 
           // siteIdフィルタリング
           if (!targetUserIds.has(userId)) {
+            console.log(`  スキップ: ${displayName} (現場フィルタ外)`);
             skipCount++;
             continue;
           }
 
           if (!fcmToken) {
+            console.log(`  スキップ: ${displayName} (FCMトークンなし)`);
             skipCount++;
             continue;
           }
-          if (!targetRoles.includes(userData.role)) {
+
+          // ユーザーの通知設定をチェック（設定がない場合はデフォルトで受信）
+          if (userData.notifications?.customNotification === false) {
+            console.log(`  スキップ: ${displayName} (カスタム通知OFF)`);
             skipCount++;
             continue;
           }
@@ -2162,22 +2154,13 @@ exports.customNotifications = onSchedule(
                 },
               },
             });
+            console.log(`  送信成功: ${displayName} (トークン: ${fcmToken.substring(0, 20)}...)`);
             successCount++;
           } catch (sendError) {
-            console.error(`カスタム通知送信失敗: ${userId} (${userData.displayName || "不明"})`, sendError.message);
+            console.error(`  送信失敗: ${displayName}`, sendError.message);
             failCount++;
           }
         }
-
-        // 送信ログを記録（重複送信防止）
-        await sentLogRef.set({
-          notificationId,
-          companyId,
-          sentAt: FieldValue.serverTimestamp(),
-          successCount,
-          failCount,
-          skipCount,
-        });
 
         console.log(`通知 ${notificationId}: 完了 - 成功: ${successCount}, 失敗: ${failCount}, スキップ: ${skipCount}`);
       }

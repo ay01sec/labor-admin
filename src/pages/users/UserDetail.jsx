@@ -22,7 +22,8 @@ import {
   EyeOff,
   Info,
   Mail,
-  Trash2
+  Trash2,
+  Bell
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -45,7 +46,12 @@ export default function UserDetail() {
     displayName: '',
     role: 'site_manager',
     employeeId: '',
-    isActive: true
+    isActive: true,
+    notifications: {
+      reportDeadline: true,
+      dailyReminder: true,
+      customNotification: true
+    }
   });
 
   // 削除モーダル用
@@ -80,7 +86,12 @@ export default function UserDetail() {
               displayName: data.displayName || '',
               role: data.role || 'worker',
               employeeId: data.employeeId || '',
-              isActive: data.isActive !== false
+              isActive: data.isActive !== false,
+              notifications: {
+                reportDeadline: data.notifications?.reportDeadline !== false,
+                dailyReminder: data.notifications?.dailyReminder !== false,
+                customNotification: data.notifications?.customNotification !== false
+              }
             });
           } else {
             setError('ユーザーが見つかりません');
@@ -147,6 +158,7 @@ export default function UserDetail() {
         const dataToUpdate = {
           displayName: formData.displayName,
           employeeId: formData.employeeId || null,
+          notifications: formData.notifications,
           updatedAt: serverTimestamp()
         };
 
@@ -422,6 +434,68 @@ export default function UserDetail() {
               <p><strong>事務員:</strong> 管理システムにアクセス可能、日報編集可能</p>
               <p><strong>現場管理者:</strong> 日報アプリのみ使用可能（管理画面アクセス不可）</p>
               <p><strong>作業員:</strong> 将来の拡張用（現在は未使用）</p>
+            </div>
+          </div>
+
+          <hr />
+
+          {/* 通知設定 */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+              <Bell size={20} className="text-blue-500" />
+              <span>通知設定</span>
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              このユーザーに送信するプッシュ通知の種類を選択してください。
+            </p>
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.notifications.reportDeadline}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, reportDeadline: e.target.checked }
+                  }))}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-700">日報提出期限通知</span>
+                  <p className="text-sm text-gray-500">日報提出の締め切り時刻に通知を送信</p>
+                </div>
+              </label>
+
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.notifications.dailyReminder}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, dailyReminder: e.target.checked }
+                  }))}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-700">日報リマインダー通知</span>
+                  <p className="text-sm text-gray-500">日報が未提出の場合にリマインダーを送信</p>
+                </div>
+              </label>
+
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.notifications.customNotification}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, customNotification: e.target.checked }
+                  }))}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-700">カスタム通知</span>
+                  <p className="text-sm text-gray-500">管理者が設定したカスタム通知を受信</p>
+                </div>
+              </label>
             </div>
           </div>
         </form>
