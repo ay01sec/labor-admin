@@ -156,6 +156,23 @@
     color: #fff;
     font-size: 17px;
   }
+  /* WiFi遮断アイコン */
+  .wifi-off {
+    position: relative;
+  }
+  .wifi-off::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 2px;
+    background: #fff;
+    transform: rotate(-45deg);
+    top: 50%;
+    left: 50%;
+    margin-left: -12px;
+    margin-top: -1px;
+    box-shadow: 0 0 2px rgba(0,0,0,0.3);
+  }
   .feature-item p { font-size: 11px; font-weight: 700; color: #0d6b3d; }
 
   /* ── ワークフロー ── */
@@ -390,7 +407,7 @@
       <p>写真添付</p>
     </div>
     <div class="feature-item">
-      <div class="f-icon"><i class="fa-solid fa-hard-drive"></i></div>
+      <div class="f-icon wifi-off"><i class="fa-solid fa-wifi"></i></div>
       <p>オフライン対応</p>
     </div>
     <div class="feature-item">

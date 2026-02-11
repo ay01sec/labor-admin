@@ -35,7 +35,7 @@
   .front-header {
     background: linear-gradient(135deg, #1a2f4a 0%, #2d5a87 100%);
     color: #fff;
-    padding: 22px 36px;
+    padding: 26px 36px;
   }
   .front-badge {
     display: inline-block;
@@ -63,7 +63,7 @@
 
   .front-catch {
     text-align: center;
-    padding: 22px 36px;
+    padding: 26px 36px;
   }
   .front-catch h2 {
     font-size: 19px;
@@ -79,12 +79,12 @@
   .two-systems {
     display: flex;
     gap: 14px;
-    padding: 0 36px 20px;
+    padding: 0 36px 24px;
   }
   .system-card {
     flex: 1;
     border-radius: 6px;
-    padding: 16px;
+    padding: 18px;
   }
   .system-card.admin {
     background: #f8fafd;
@@ -126,10 +126,30 @@
   .system-card.admin .system-features span { background: #e8f0fe; color: #1a2f4a; }
   .system-card.report .system-features span { background: #e8f5ed; color: #0d6b3d; }
   .system-features span i { font-size: 10px; }
+  /* WiFi遮断アイコン */
+  .wifi-off {
+    position: relative;
+  }
+  .wifi-off::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 2px;
+    background: currentColor;
+    transform: rotate(-45deg);
+    top: 50%;
+    left: 50%;
+    margin-left: -9px;
+    margin-top: -1px;
+  }
+  .wifi-off-lg::after {
+    width: 24px;
+    margin-left: -12px;
+  }
 
   .integration {
     background: #f8f9fc;
-    padding: 20px 36px;
+    padding: 24px 36px;
     border-top: 1px solid #e8ecf0;
     border-bottom: 1px solid #e8ecf0;
   }
@@ -189,7 +209,7 @@
   .front-benefits {
     display: flex;
     gap: 12px;
-    padding: 20px 36px;
+    padding: 24px 36px;
   }
   .front-benefit {
     flex: 1;
@@ -197,7 +217,7 @@
     background: linear-gradient(135deg, #1a2f4a, #2d5a87);
     color: #fff;
     border-radius: 6px;
-    padding: 18px 10px;
+    padding: 20px 10px;
   }
   .front-benefit .big-num { font-size: 32px; font-weight: 800; color: #7ec8e3; }
   .front-benefit .big-num span { font-size: 12px; font-weight: 600; }
@@ -205,7 +225,7 @@
 
   .front-sales {
     background: #1a2f4a;
-    padding: 20px 36px;
+    padding: 24px 36px;
     text-align: center;
   }
   .front-sales h3 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
@@ -223,7 +243,7 @@
 
   .front-footer {
     background: #f8f9fc;
-    padding: 12px 36px;
+    padding: 16px 36px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -252,14 +272,14 @@
   .back-header {
     background: linear-gradient(135deg, #1a2f4a, #2d5a87);
     color: #fff;
-    padding: 14px 36px;
+    padding: 18px 36px;
     text-align: center;
   }
   .back-header h2 { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
 
   .back-main { flex: 1; display: flex; flex-direction: column; }
 
-  .detail-section { padding: 20px 36px; }
+  .detail-section { padding: 24px 36px; }
   .detail-section.admin-detail { background: #fff; }
   .detail-section.report-detail { background: #fafcfa; }
   .detail-header {
@@ -307,7 +327,7 @@
   .detail-feature .df-desc { font-size: 8px; color: #666; margin-top: 3px; }
 
   .synergy-section {
-    padding: 18px 36px;
+    padding: 22px 36px;
     background: #fff;
     border-top: 1px solid #e8ecf0;
   }
@@ -340,7 +360,7 @@
   .synergy-item p { font-size: 9px; color: #666; line-height: 1.4; }
 
   .problems-section {
-    padding: 18px 36px;
+    padding: 22px 36px;
     background: #f8f9fc;
     border-top: 1px solid #e8ecf0;
   }
@@ -369,7 +389,7 @@
 
   .back-footer {
     background: #f8f9fc;
-    padding: 12px 36px;
+    padding: 16px 36px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -425,7 +445,7 @@
         <div class="system-features">
           <span><i class="fa-solid fa-signature"></i> 電子署名</span>
           <span><i class="fa-solid fa-image"></i> 写真添付</span>
-          <span><i class="fa-solid fa-hard-drive"></i> オフライン対応</span>
+          <span><i class="fa-solid fa-wifi wifi-off"></i> オフライン対応</span>
           <span><i class="fa-solid fa-mobile-screen"></i> ネイティブアプリ</span>
         </div>
       </div>
@@ -557,7 +577,7 @@
           <div class="df-desc">現場写真を最大3枚添付</div>
         </div>
         <div class="detail-feature">
-          <i class="fa-solid fa-hard-drive df-icon"></i>
+          <i class="fa-solid fa-wifi df-icon wifi-off wifi-off-lg"></i>
           <p>オフライン対応</p>
           <div class="df-desc">電波なしでも下書き保存</div>
         </div>
@@ -594,7 +614,7 @@
           </div>
         </div>
         <div class="synergy-item">
-          <div class="synergy-icon"><i class="fa-solid fa-hard-drive"></i></div>
+          <div class="synergy-icon wifi-off"><i class="fa-solid fa-wifi"></i></div>
           <div>
             <h4>オフライン対応</h4>
             <p>電波の届かない現場でも下書き保存。復帰時に自動同期。</p>
