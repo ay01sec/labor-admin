@@ -49,9 +49,6 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Install serve
-        run: npm install -g serve
-
       - name: Run E2E tests
         run: npm run test:e2e
         env:
