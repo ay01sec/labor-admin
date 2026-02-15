@@ -462,6 +462,13 @@ export default function Register() {
           {/* ステップ3: 登録完了 */}
           {currentStep === 3 && (
             <div className="space-y-6 text-center">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-600 font-bold">
+                  登録したメールアドレスに<br />
+                  ログイン情報の詳細を送信しました
+                </p>
+              </div>
+
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle size={32} className="text-green-600" />
               </div>
@@ -499,10 +506,6 @@ export default function Register() {
                   <li>「ログイン」をクリック</li>
                 </ol>
               </div>
-
-              <p className="text-sm text-gray-500">
-                登録したメールアドレスにログイン情報の詳細を送信しました
-              </p>
 
               <Link
                 to="/login"

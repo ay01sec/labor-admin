@@ -1,41 +1,83 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // 会社の画像フォルダ
+
+    // ========== 会社の画像フォルダ（労務管理用） ==========
+    // パス: companies/{companyId}/images/{fileName}
     match /companies/{companyId}/images/{allPaths=**} {
-      // 認証済みユーザーで、自社のフォルダにのみアクセス可能
+      // 読み取り：認証済みユーザー
       allow read: if request.auth != null;
+      // 書き込み：認証済みユーザー + サイズ・形式制限
       allow write: if request.auth != null
         && request.resource.size < 2 * 1024 * 1024  // 2MB以下
-        && request.resource.contentType.matches('image/.*');  // 画像のみ
+        && request.resource.contentType.matches('image/.*');
+      // 削除：認証済みユーザー
       allow delete: if request.auth != null;
     }
 
-    // 日報の写真フォルダ
-    match /reports/{companyId}/{allPaths=**} {
+    // ========== 日報写真（日報アプリ用） ==========
+    // パス: companies/{companyId}/reports/{reportId}/photos/{fileName}
+    match /companies/{companyId}/reports/{reportId}/photos/{fileName} {
+      // 読み取り：認証済みユーザー
       allow read: if request.auth != null;
+      // 書き込み：認証済みユーザー + サイズ・形式制限
       allow write: if request.auth != null
-        && request.resource.size < 5 * 1024 * 1024;  // 5MB以下
+        && request.resource.size < 10 * 1024 * 1024  // 10MB制限
+        && request.resource.contentType.matches('image/.*');
+      // 削除：認証済みユーザー
       allow delete: if request.auth != null;
     }
 
-    // 署名フォルダ
+    // ========== PDF・QRコード（公開読み取り） ==========
+    // パス: companies/{companyId}/reports/{reportId}/{fileName}
+    // ※ photos配下とは別パスなので競合しない
+    match /companies/{companyId}/reports/{reportId}/{fileName} {
+      // 読み取り：誰でもOK（URLを知っている人のみアクセス可能）
+      allow read: if true;
+      // 書き込み：Cloud Functions（Admin SDK）のみ許可
+      allow write: if false;
+    }
+
+    // ========== 署名画像 ==========
+    // パス: signatures/{companyId}/{reportId}/{fileName}
+    match /signatures/{companyId}/{reportId}/{fileName} {
+      // 読み取り：認証済みユーザー
+      allow read: if request.auth != null;
+      // 書き込み：認証済みユーザー + サイズ・形式制限
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024  // 5MB制限
+        && request.resource.contentType.matches('image/.*');
+      // 削除：認証済みユーザー
+      allow delete: if request.auth != null;
+    }
+
+    // ========== 署名画像（旧パス互換） ==========
+    // パス: signatures/{companyId}/{allPaths=**}
     match /signatures/{companyId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null
-        && request.resource.size < 2 * 1024 * 1024  // 2MB以下
-        && request.resource.contentType.matches('image/.*');  // 画像のみ
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
       allow delete: if request.auth != null;
     }
 
-    // PDFフォルダ
+    // ========== 日報フォルダ（旧パス互換） ==========
+    // パス: reports/{companyId}/{allPaths=**}
+    match /reports/{companyId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if request.auth != null;
+    }
+
+    // ========== PDFフォルダ ==========
     match /pdfs/{companyId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
       allow delete: if request.auth != null;
     }
 
-    // QRコードフォルダ
+    // ========== QRコードフォルダ ==========
     match /qrcodes/{companyId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
