@@ -20,6 +20,17 @@ const auth = getAuth();
 const bucket = getStorage().bucket();
 const messaging = getMessaging();
 
+/**
+ * UTCの日付を日本時間（JST）に変換
+ * @param {Date} date - UTC日付
+ * @returns {Date} - JST日付
+ */
+function toJST(date) {
+  const jstOffset = 9 * 60; // JST = UTC + 9時間
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  return new Date(utc + jstOffset * 60000);
+}
+
 // PAY.JP初期化（環境変数から）
 function getPayjp() {
   const secretKey = process.env.PAYJP_SECRET_KEY;
@@ -727,10 +738,11 @@ function generateReportPdf(report, companyData, fontPath, signatureImageBuffer, 
         : new Date(report.reportDate);
       const dateStr = `${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
 
-      const submittedAt = report.submittedAt?.toDate
+      const submittedAtUtc = report.submittedAt?.toDate
         ? report.submittedAt.toDate()
         : report.submittedAt ? new Date(report.submittedAt) : new Date();
-      const reportDateStr = `${submittedAt.getMonth() + 1}月${submittedAt.getDate()}日`;
+      const submittedAtJst = toJST(submittedAtUtc);
+      const reportDateStr = `${submittedAtJst.getMonth() + 1}月${submittedAtJst.getDate()}日`;
 
       // === ロゴ・会社名・報告日（上段） ===
       let currentY = 50;
@@ -1150,10 +1162,11 @@ function generateReportPdfForEmail(reportData, companyData, signatureImageBuffer
         : new Date(reportData.reportDate);
       const dateStr = `${reportDate.getMonth() + 1}月${reportDate.getDate()}日`;
 
-      const submittedAt = reportData.submittedAt?.toDate
+      const submittedAtUtc = reportData.submittedAt?.toDate
         ? reportData.submittedAt.toDate()
         : reportData.submittedAt ? new Date(reportData.submittedAt) : new Date();
-      const reportDateStr = `${submittedAt.getMonth() + 1}月${submittedAt.getDate()}日`;
+      const submittedAtJst = toJST(submittedAtUtc);
+      const reportDateStr = `${submittedAtJst.getMonth() + 1}月${submittedAtJst.getDate()}日`;
 
       // === ロゴ・会社名・報告日（上段） ===
       let currentY = 50;
