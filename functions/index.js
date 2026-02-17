@@ -1365,6 +1365,9 @@ exports.onAutoApproveReport = onDocumentUpdated(
   {
     document: "companies/{companyId}/dailyReports/{reportId}",
     region: "asia-northeast1",
+    memory: "1GiB",
+    timeoutSeconds: 300,
+    retry: true,
     secrets: [sendgridApiKey],
   },
   async (event) => {
