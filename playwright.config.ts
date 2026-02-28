@@ -15,7 +15,7 @@ export default defineConfig({
     process.env.CI ? ['github'] : ['list'],
   ],
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -31,8 +31,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: process.env.CI ? 'npx serve -s dist -l tcp://0.0.0.0:5173' : 'npm run dev -- --host',
-    url: 'http://localhost:5173',
+    command: process.env.CI ? 'npx serve -s dist -l tcp://0.0.0.0:3000' : 'npm run dev -- --host',
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
     stdout: 'pipe',
