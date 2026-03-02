@@ -67,14 +67,21 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
     let timer;
     let attempts = 0;
     const maxAttempts = 30;
+    let isMounted = true;
+
+    console.log(`[PayjpCardForm:${formId}] useEffect開始`);
 
     const initPayjp = () => {
+      if (!isMounted) return;
       attempts++;
 
       // PAY.JP SDKの読み込みを待つ
       if (!window.Payjp) {
+        console.log(`[PayjpCardForm:${formId}] Payjp not found, attempt ${attempts}`);
         if (attempts < maxAttempts) {
           timer = setTimeout(initPayjp, 200);
+        } else {
+          setCardError('PAY.JP SDKの読み込みに失敗しました');
         }
         return;
       }
@@ -84,17 +91,25 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
       const cardExpiryEl = document.getElementById(cardExpiryId);
       const cardCvcEl = document.getElementById(cardCvcId);
 
+      console.log(`[PayjpCardForm:${formId}] DOM: number=${!!cardNumberEl}, expiry=${!!cardExpiryEl}, cvc=${!!cardCvcEl}`);
+
       if (!cardNumberEl || !cardExpiryEl || !cardCvcEl) {
         if (attempts < maxAttempts) {
           timer = setTimeout(initPayjp, 200);
+        } else {
+          setCardError('カードフォームの初期化に失敗しました');
         }
         return;
       }
 
       // 既に初期化済みならスキップ
-      if (cardNumberElementRef.current) return;
+      if (cardNumberElementRef.current) {
+        console.log(`[PayjpCardForm:${formId}] Already initialized`);
+        return;
+      }
 
       try {
+        console.log(`[PayjpCardForm:${formId}] Creating Payjp instance...`);
         const payjp = window.Payjp(PAYJP_PUBLIC_KEY);
         payjpRef.current = payjp;
         const elements = payjp.elements();
@@ -112,6 +127,7 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
         const cardExpiry = elements.create('cardExpiry', { style });
         const cardCvc = elements.create('cardCvc', { style });
 
+        console.log(`[PayjpCardForm:${formId}] Mounting elements...`);
         cardNumber.mount(`#${cardNumberId}`);
         cardExpiry.mount(`#${cardExpiryId}`);
         cardCvc.mount(`#${cardCvcId}`);
@@ -120,22 +136,27 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
         cardExpiryElementRef.current = cardExpiry;
         cardCvcElementRef.current = cardCvc;
         setReady(true);
+        console.log(`[PayjpCardForm:${formId}] Mount complete, ready=true`);
 
         cardNumber.on('change', (event) => {
           if (event.error) setCardError(event.error.message);
           else setCardError('');
         });
       } catch (err) {
-        console.error('PAY.JP初期化エラー:', err);
-        setCardError('カードフォームの初期化に失敗しました');
+        console.error(`[PayjpCardForm:${formId}] 初期化エラー:`, err);
+        setCardError('カードフォームの初期化に失敗しました: ' + err.message);
       }
     };
 
     if (PAYJP_PUBLIC_KEY) {
-      timer = setTimeout(initPayjp, 200);
+      timer = setTimeout(initPayjp, 300);
+    } else {
+      setCardError('PAY.JP公開キーが設定されていません');
     }
 
     return () => {
+      console.log(`[PayjpCardForm:${formId}] Cleanup`);
+      isMounted = false;
       clearTimeout(timer);
       if (cardNumberElementRef.current) {
         try { cardNumberElementRef.current.unmount(); } catch (e) {}
@@ -149,6 +170,7 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
         try { cardCvcElementRef.current.unmount(); } catch (e) {}
         cardCvcElementRef.current = null;
       }
+      setReady(false);
     };
   }, [formId, cardNumberId, cardExpiryId, cardCvcId]);
 
