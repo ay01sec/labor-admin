@@ -3115,7 +3115,7 @@ exports.monthlyBilling = onSchedule(
             .doc(companyId)
             .collection("users")
             .where("isActive", "==", true)
-            .where("role", "in", ["admin", "manager"])
+            .where("role", "in", ["admin", "office", "manager", "site_manager"])
             .get();
 
           const userCount = usersSnapshot.size;
@@ -3250,7 +3250,7 @@ exports.executeBilling = onCall(
         .doc(companyId)
         .collection("users")
         .where("isActive", "==", true)
-        .where("role", "in", ["admin", "manager"])
+        .where("role", "in", ["admin", "office", "manager", "site_manager"])
         .get();
 
       const userCount = usersSnapshot.size;
@@ -3416,7 +3416,7 @@ exports.calculateCurrentBilling = onCall(
         .doc(companyId)
         .collection("users")
         .where("isActive", "==", true)
-        .where("role", "in", ["admin", "manager"])
+        .where("role", "in", ["admin", "office", "manager", "site_manager"])
         .get();
 
       const userCount = usersSnapshot.size;

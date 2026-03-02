@@ -1720,7 +1720,7 @@ export default function CompanySettings() {
                     <div className="flex items-center justify-between pb-4 border-b border-blue-200">
                       <div>
                         <h3 className="font-medium text-gray-900">基本料金</h3>
-                        <p className="text-sm text-gray-600">現場管理者3名まで含む</p>
+                        <p className="text-sm text-gray-600">ユーザー3名まで含む（作業員を除く）</p>
                       </div>
                       <div className="text-right">
                         <span className="text-2xl font-bold text-blue-600">¥1,200</span>
@@ -1732,7 +1732,7 @@ export default function CompanySettings() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-medium text-gray-900">追加料金</h3>
-                        <p className="text-sm text-gray-600">4人目以降の現場管理者</p>
+                        <p className="text-sm text-gray-600">4人目以降のユーザー（作業員を除く）</p>
                       </div>
                       <div className="text-right">
                         <span className="text-2xl font-bold text-blue-600">¥300</span>
