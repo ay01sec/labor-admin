@@ -417,8 +417,11 @@ exports.registerCard = onCall(
       };
     } catch (error) {
       console.error("カード登録エラー:", error);
+      console.error("エラー詳細:", JSON.stringify(error, null, 2));
       if (error instanceof HttpsError) throw error;
-      throw new HttpsError("internal", "カード登録に失敗しました");
+      // PAY.JPエラーの場合、詳細メッセージを含める
+      const errorMessage = error?.body?.error?.message || error?.message || "カード登録に失敗しました";
+      throw new HttpsError("internal", `カード登録に失敗しました: ${errorMessage}`);
     }
   }
 );
