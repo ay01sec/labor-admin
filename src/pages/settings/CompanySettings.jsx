@@ -2153,8 +2153,8 @@ export default function CompanySettings() {
                   */}
                 </div>
 
-                {/* クレジットカード登録フォーム */}
-                {selectedPaymentMethod === 'card' && isAdmin() && (
+                {/* クレジットカード登録フォーム（カード未登録時のみ表示） */}
+                {selectedPaymentMethod === 'card' && isAdmin() && !billing?.cardLast4 && (
                   <div className="bg-gray-50 rounded-lg p-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-4">カード情報の入力</h3>
                     {PAYJP_PUBLIC_KEY ? (
@@ -2172,6 +2172,19 @@ export default function CompanySettings() {
                     )}
                     <p className="text-xs text-gray-500 mt-4">
                       ※ カード情報はPAY.JP社により安全に管理されます。当社サーバーにカード番号は保存されません。
+                    </p>
+                  </div>
+                )}
+
+                {/* カード登録済みの場合のメッセージ */}
+                {selectedPaymentMethod === 'card' && isAdmin() && billing?.cardLast4 && (
+                  <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                    <div className="flex items-center space-x-2 text-green-700">
+                      <CheckCircle size={20} />
+                      <span className="font-medium">クレジットカード登録済み</span>
+                    </div>
+                    <p className="text-sm text-green-600 mt-2">
+                      カード情報を変更する場合は、上部「ご利用状況」の「カード情報を変更」ボタンをご利用ください。
                     </p>
                   </div>
                 )}
