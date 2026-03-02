@@ -141,17 +141,29 @@
 
 ## 環境変数
 
-### フロントエンド (`.env`)
+### フロントエンド (`.env` / `.env.production`)
 ```
 VITE_PAYJP_PUBLIC_KEY=pk_...
 VITE_FIREBASE_API_KEY=...
 ```
+
+**PAY.JPキー切り替え:**
+- 本番用: `.env.production` に設定済み（`pk_live_...`）
+- テスト用: `.env` にコメントで保持（`pk_test_447266e79f203c5af45af804`）
 
 ### Cloud Functions
 ```
 PAYJP_SECRET_KEY (Firebase Secret)
 SENDGRID_API_KEY (Firebase Secret)
 ```
+
+**PAY.JPシークレットキー切り替え:**
+```bash
+# 本番/テスト切り替え
+firebase functions:secrets:set PAYJP_SECRET_KEY
+# → PAY.JPダッシュボードから取得したシークレットキーを入力
+```
+※テスト用シークレットキーは`.env.local.backup`に保管
 
 ---
 
