@@ -247,16 +247,40 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
-        <div id={cardNumberId} className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
+        <div
+          id={cardNumberId}
+          className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px] cursor-text"
+          style={{ position: 'relative', zIndex: 10 }}
+          onClick={(e) => {
+            const iframe = e.currentTarget.querySelector('iframe');
+            if (iframe) iframe.focus();
+          }}
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">有効期限</label>
-          <div id={cardExpiryId} className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
+          <div
+            id={cardExpiryId}
+            className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px] cursor-text"
+            style={{ position: 'relative', zIndex: 10 }}
+            onClick={(e) => {
+              const iframe = e.currentTarget.querySelector('iframe');
+              if (iframe) iframe.focus();
+            }}
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">CVC</label>
-          <div id={cardCvcId} className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
+          <div
+            id={cardCvcId}
+            className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px] cursor-text"
+            style={{ position: 'relative', zIndex: 10 }}
+            onClick={(e) => {
+              const iframe = e.currentTarget.querySelector('iframe');
+              if (iframe) iframe.focus();
+            }}
+          />
         </div>
       </div>
       {cardError && (
