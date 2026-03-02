@@ -69,7 +69,7 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
     const maxAttempts = 30;
     let isMounted = true;
 
-    console.log(`[PayjpCardForm:${formId}] useEffect開始`);
+    console.log(`[PayjpCardForm:${formId}] useEffect開始, PAYJP_PUBLIC_KEY="${PAYJP_PUBLIC_KEY}"`);
 
     const initPayjp = () => {
       if (!isMounted) return;
