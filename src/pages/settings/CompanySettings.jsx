@@ -543,6 +543,8 @@ export default function CompanySettings() {
   // 日次課金テスト用
   const [dailyBillingTest, setDailyBillingTest] = useState(null);
   const [dailyBillingTestLoading, setDailyBillingTestLoading] = useState(false);
+  // カード変更用
+  const [showCardUpdateForm, setShowCardUpdateForm] = useState(false);
 
   // 解約モーダル
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -1760,11 +1762,42 @@ export default function CompanySettings() {
                   )}
 
                   {billing?.paymentMethod === 'card' && billing?.cardLast4 && (
-                    <div className="flex items-center space-x-3 mt-3">
-                      <span className="text-sm font-medium text-gray-600">登録カード:</span>
-                      <span className="text-sm text-gray-800">
-                        {CARD_BRAND_LABELS[billing.cardBrand] || billing.cardBrand} **** {billing.cardLast4}
-                      </span>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm font-medium text-gray-600">登録カード:</span>
+                          <span className="text-sm text-gray-800">
+                            {CARD_BRAND_LABELS[billing.cardBrand] || billing.cardBrand} **** {billing.cardLast4}
+                          </span>
+                        </div>
+                        {isAdmin() && (
+                          <button
+                            onClick={() => setShowCardUpdateForm(!showCardUpdateForm)}
+                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
+                          >
+                            <CreditCard size={14} />
+                            <span>{showCardUpdateForm ? 'キャンセル' : 'カード情報を変更'}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* カード変更フォーム */}
+                      {showCardUpdateForm && isAdmin() && (
+                        <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
+                          <h4 className="text-sm font-medium text-gray-800 mb-3">新しいカード情報を入力</h4>
+                          <PayjpCardForm
+                            companyId={companyId}
+                            onSuccess={(result) => {
+                              setShowCardUpdateForm(false);
+                              fetchBilling();
+                              alert(`カード情報を更新しました\n${result.card.brand} **** ${result.card.last4}`);
+                            }}
+                            onError={(error) => {
+                              alert(`カード更新エラー: ${error}`);
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                   {billing?.paymentMethod === 'invoice' && (
