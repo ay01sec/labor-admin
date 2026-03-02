@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentUpdated, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
+const payjpSecretKey = defineSecret("PAYJP_SECRET_KEY");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
@@ -249,7 +250,7 @@ ${displayName} 様
  * - active: カード情報を更新
  */
 exports.registerCard = onCall(
-  { region: "asia-northeast1", maxInstances: 10 },
+  { region: "asia-northeast1", maxInstances: 10, secrets: [payjpSecretKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "認証が必要です");
@@ -3460,6 +3461,7 @@ exports.dailyBillingProcessor = onSchedule(
     schedule: "0 9 * * *", // 毎日 09:00
     timeZone: "Asia/Tokyo",
     region: "asia-northeast1",
+    secrets: [payjpSecretKey],
   },
   async () => {
     console.log("日次課金処理を開始します");
@@ -3799,7 +3801,7 @@ exports.monthlyBilling = onSchedule(
  * 手動課金実行（管理者用・テスト用）
  */
 exports.executeBilling = onCall(
-  { region: "asia-northeast1", maxInstances: 10 },
+  { region: "asia-northeast1", maxInstances: 10, secrets: [payjpSecretKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "認証が必要です");
@@ -4124,7 +4126,7 @@ function getStatusLabel(status) {
  * をステータスに応じて実行します。
  */
 exports.testDailyBilling = onCall(
-  { region: "asia-northeast1", maxInstances: 10 },
+  { region: "asia-northeast1", maxInstances: 10, secrets: [payjpSecretKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "認証が必要です");
