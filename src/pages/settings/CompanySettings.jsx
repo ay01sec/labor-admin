@@ -1711,6 +1711,61 @@ export default function CompanySettings() {
                 </div>
               </div>
 
+              {/* 料金プラン */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">料金プラン</h2>
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100">
+                  <div className="space-y-4">
+                    {/* 基本料金 */}
+                    <div className="flex items-center justify-between pb-4 border-b border-blue-200">
+                      <div>
+                        <h3 className="font-medium text-gray-900">基本料金</h3>
+                        <p className="text-sm text-gray-600">現場管理者3名まで含む</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-blue-600">¥1,200</span>
+                        <span className="text-gray-600 text-sm">/月（税込）</span>
+                      </div>
+                    </div>
+
+                    {/* 追加料金 */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-gray-900">追加料金</h3>
+                        <p className="text-sm text-gray-600">4人目以降の現場管理者</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-blue-600">¥300</span>
+                        <span className="text-gray-600 text-sm">/人/月（税込）</span>
+                      </div>
+                    </div>
+
+                    {/* 料金例 */}
+                    <div className="mt-4 pt-4 border-t border-blue-200">
+                      <p className="text-sm font-medium text-gray-700 mb-2">料金例:</p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex justify-between bg-white/50 rounded px-3 py-2">
+                          <span className="text-gray-600">3名以下</span>
+                          <span className="font-medium">¥1,200/月</span>
+                        </div>
+                        <div className="flex justify-between bg-white/50 rounded px-3 py-2">
+                          <span className="text-gray-600">5名</span>
+                          <span className="font-medium">¥1,800/月</span>
+                        </div>
+                        <div className="flex justify-between bg-white/50 rounded px-3 py-2">
+                          <span className="text-gray-600">10名</span>
+                          <span className="font-medium">¥3,300/月</span>
+                        </div>
+                        <div className="flex justify-between bg-white/50 rounded px-3 py-2">
+                          <span className="text-gray-600">20名</span>
+                          <span className="font-medium">¥6,300/月</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 課金テストセクション（管理者のみ） */}
               {isAdmin() && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
