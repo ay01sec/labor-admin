@@ -535,6 +535,12 @@ export default function CompanySettings() {
   });
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
 
+  // 課金テスト用の状態
+  const [billingTest, setBillingTest] = useState(null);
+  const [billingTestLoading, setBillingTestLoading] = useState(false);
+  const [billingTestError, setBillingTestError] = useState('');
+  const [executingBilling, setExecutingBilling] = useState(false);
+
   // 解約モーダル
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelConfirmName, setCancelConfirmName] = useState('');
@@ -1704,6 +1710,120 @@ export default function CompanySettings() {
                   )}
                 </div>
               </div>
+
+              {/* 課金テストセクション（管理者のみ） */}
+              {isAdmin() && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h3 className="text-sm font-semibold text-blue-800 mb-4 flex items-center space-x-2">
+                    <Settings size={16} />
+                    <span>課金テスト（開発用）</span>
+                  </h3>
+
+                  <div className="space-y-4">
+                    {/* 料金計算ボタン */}
+                    <div>
+                      <button
+                        onClick={async () => {
+                          setBillingTestLoading(true);
+                          setBillingTestError('');
+                          setBillingTest(null);
+                          try {
+                            const calculateFn = httpsCallable(functions, 'calculateCurrentBilling');
+                            const result = await calculateFn({ companyId });
+                            setBillingTest(result.data);
+                          } catch (err) {
+                            setBillingTestError(err.message || '料金計算に失敗しました');
+                          } finally {
+                            setBillingTestLoading(false);
+                          }
+                        }}
+                        disabled={billingTestLoading}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+                      >
+                        {billingTestLoading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <FileText size={16} />
+                        )}
+                        <span>料金を計算</span>
+                      </button>
+                    </div>
+
+                    {/* 計算結果表示 */}
+                    {billingTest && (
+                      <div className="bg-white rounded-lg p-4 border border-blue-200">
+                        <h4 className="font-medium text-gray-800 mb-3">計算結果</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">対象ユーザー数:</span>
+                            <span className="font-medium">{billingTest.userCount}名</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">基本料金:</span>
+                            <span>¥{billingTest.breakdown?.basePrice?.toLocaleString()}</span>
+                          </div>
+                          {billingTest.breakdown?.additionalUsers > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">追加料金 ({billingTest.breakdown.additionalUsers}名):</span>
+                              <span>¥{billingTest.breakdown.additionalAmount?.toLocaleString()}</span>
+                            </div>
+                          )}
+                          <hr className="my-2" />
+                          <div className="flex justify-between text-base font-semibold">
+                            <span>合計金額（税込）:</span>
+                            <span className="text-blue-600">¥{billingTest.amount?.toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {/* 課金実行ボタン */}
+                        {billing?.paymentMethod === 'card' && billing?.cardLast4 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`テスト課金を実行しますか？\n金額: ¥${billingTest.amount?.toLocaleString()}\n※テストモードでは実際の決済は発生しません`)) {
+                                  return;
+                                }
+                                setExecutingBilling(true);
+                                setBillingTestError('');
+                                try {
+                                  const executeFn = httpsCallable(functions, 'executeBilling');
+                                  const result = await executeFn({ companyId, testMode: false });
+                                  alert(`課金成功！\nchargeId: ${result.data.chargeId}\n金額: ¥${result.data.amount?.toLocaleString()}\n領収書番号: ${result.data.receiptNumber || '生成中...'}`);
+                                  // billing情報を再取得
+                                  fetchBilling();
+                                } catch (err) {
+                                  setBillingTestError(err.message || '課金に失敗しました');
+                                } finally {
+                                  setExecutingBilling(false);
+                                }
+                              }}
+                              disabled={executingBilling}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
+                            >
+                              {executingBilling ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <CreditCard size={16} />
+                              )}
+                              <span>課金を実行（テスト）</span>
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2">
+                              ※ PAY.JPテストキー使用中は実際の決済は発生しません
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* エラー表示 */}
+                    {billingTestError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                        {billingTestError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <hr />
 
