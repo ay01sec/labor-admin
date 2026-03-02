@@ -31,6 +31,98 @@ function toJST(date) {
   return new Date(utc + jstOffset * 60000);
 }
 
+// ============================================================
+// Custom Claims for Storage Security
+// ============================================================
+
+/**
+ * ユーザーが企業に追加された時、companyIdをCustom Claimに設定
+ */
+exports.onUserAddedToCompany = onDocumentCreated(
+  {
+    document: "companies/{companyId}/users/{userId}",
+    region: "asia-northeast1",
+  },
+  async (event) => {
+    const companyId = event.params.companyId;
+    const userId = event.params.userId;
+
+    try {
+      // Custom ClaimにcompanyIdを設定
+      await auth.setCustomUserClaims(userId, { companyId });
+      console.log(`Custom Claim設定完了: userId=${userId}, companyId=${companyId}`);
+
+      // ユーザードキュメントにclaimsUpdatedAtを記録（クライアント側でトークン更新の判断に使用）
+      await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .doc(userId)
+        .update({ claimsUpdatedAt: Timestamp.now() });
+    } catch (error) {
+      console.error("Custom Claim設定エラー:", error);
+    }
+  }
+);
+
+/**
+ * 既存ユーザー向け：companyIdをCustom Claimに設定（Callable Function）
+ * ログイン後にクライアントから呼び出す
+ */
+exports.setCompanyClaim = onCall(
+  {
+    region: "asia-northeast1",
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const userId = request.auth.uid;
+
+    try {
+      // ユーザーが所属する企業を検索
+      const companiesSnapshot = await db.collection("companies").get();
+
+      let foundCompanyId = null;
+      for (const companyDoc of companiesSnapshot.docs) {
+        const userDoc = await companyDoc.ref.collection("users").doc(userId).get();
+
+        if (userDoc.exists) {
+          foundCompanyId = companyDoc.id;
+          break;
+        }
+      }
+
+      if (!foundCompanyId) {
+        throw new HttpsError("not-found", "所属企業が見つかりません");
+      }
+
+      // 既存のClaimを確認
+      const user = await auth.getUser(userId);
+      const currentClaims = user.customClaims || {};
+
+      // 既に正しいcompanyIdが設定されている場合はスキップ
+      if (currentClaims.companyId === foundCompanyId) {
+        console.log(`Custom Claim既存: userId=${userId}, companyId=${foundCompanyId}`);
+        return { companyId: foundCompanyId, updated: false };
+      }
+
+      // Custom Claimを設定
+      await auth.setCustomUserClaims(userId, { ...currentClaims, companyId: foundCompanyId });
+      console.log(`Custom Claim更新: userId=${userId}, companyId=${foundCompanyId}`);
+
+      return { companyId: foundCompanyId, updated: true };
+    } catch (error) {
+      console.error("setCompanyClaim エラー:", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError("internal", "Custom Claim設定に失敗しました");
+    }
+  }
+);
+
 // PAY.JP初期化（環境変数から）
 function getPayjp() {
   const secretKey = process.env.PAYJP_SECRET_KEY;
@@ -2654,6 +2746,697 @@ exports.migrateSignatureData = onCall(
       console.error("署名データ移行エラー:", error);
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "移行に失敗しました");
+    }
+  }
+);
+
+// ========================================
+// 月額課金関連
+// ========================================
+
+/**
+ * 料金体系定数
+ */
+const PRICING = {
+  BASE_PRICE: 1200, // 基本料金（税込）
+  ADDITIONAL_PRICE_PER_USER: 300, // 追加料金（4人目以降）
+  FREE_USER_COUNT: 3, // 基本料金に含まれるユーザー数
+  TRIAL_DAYS: 30, // トライアル期間
+};
+
+/**
+ * 課金金額を計算
+ * @param {number} userCount - 現場管理者の人数
+ * @returns {number} - 課金金額（円）
+ */
+function calculateBillingAmount(userCount) {
+  if (userCount <= PRICING.FREE_USER_COUNT) {
+    return PRICING.BASE_PRICE;
+  }
+  const additionalUsers = userCount - PRICING.FREE_USER_COUNT;
+  return PRICING.BASE_PRICE + additionalUsers * PRICING.ADDITIONAL_PRICE_PER_USER;
+}
+
+/**
+ * 領収書番号を生成
+ * @param {string} billingMonth - 課金月（YYYY-MM形式）
+ * @param {string} companyId - 企業ID
+ * @returns {string} - 領収書番号
+ */
+function generateReceiptNumber(billingMonth, companyId) {
+  const monthPart = billingMonth.replace("-", "");
+  const companyPart = companyId.substring(0, 6).toUpperCase();
+  const timestamp = Date.now().toString(36).toUpperCase();
+  return `RCP-${monthPart}-${companyPart}-${timestamp}`;
+}
+
+/**
+ * 領収書PDFを生成
+ * @param {Object} params - 領収書パラメータ
+ * @returns {Promise<Buffer>} - PDFバッファ
+ */
+function generateReceiptPdf(params) {
+  const {
+    receiptNumber,
+    companyName,
+    amount,
+    billingMonth,
+    userCount,
+    issuedAt,
+  } = params;
+
+  return new Promise((resolve, reject) => {
+    try {
+      const fontPath = path.join(__dirname, "fonts", "NotoSansJP-Regular.otf");
+      const doc = new PDFDocument({ size: "A4", margin: 50 });
+      const buffers = [];
+
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
+
+      doc.registerFont("NotoSans", fontPath);
+      doc.font("NotoSans");
+
+      const LEFT = 50;
+      const RIGHT = 545;
+      const CENTER = (LEFT + RIGHT) / 2;
+
+      // タイトル
+      doc.fontSize(28).text("領 収 書", LEFT, 80, { align: "center" });
+
+      // 領収書番号
+      doc.fontSize(10).text(`No. ${receiptNumber}`, RIGHT - 150, 80, { width: 150, align: "right" });
+
+      // 発行日
+      doc.fontSize(11).text(`発行日: ${issuedAt}`, RIGHT - 150, 95, { width: 150, align: "right" });
+
+      // 宛名
+      doc.fontSize(14).text(`${companyName} 御中`, LEFT, 150);
+
+      // 金額ボックス
+      const amountY = 200;
+      doc.rect(LEFT, amountY, RIGHT - LEFT, 60).stroke();
+      doc.fontSize(12).text("金額", LEFT + 20, amountY + 10);
+
+      const formattedAmount = `¥${amount.toLocaleString()}-`;
+      doc.fontSize(24).text(formattedAmount, LEFT, amountY + 25, {
+        width: RIGHT - LEFT,
+        align: "center"
+      });
+
+      // 但し書き
+      doc.fontSize(11).text("但し、労務管理アプリ月額使用料として", LEFT, amountY + 80);
+
+      // 内訳
+      const detailY = amountY + 120;
+      doc.fontSize(10).text("【内訳】", LEFT, detailY);
+
+      const basePrice = PRICING.BASE_PRICE;
+      const additionalUsers = Math.max(0, userCount - PRICING.FREE_USER_COUNT);
+      const additionalAmount = additionalUsers * PRICING.ADDITIONAL_PRICE_PER_USER;
+
+      doc.text(`対象月: ${billingMonth}`, LEFT + 20, detailY + 20);
+      doc.text(`基本料金: ¥${basePrice.toLocaleString()}`, LEFT + 20, detailY + 35);
+      doc.text(`利用者数: ${userCount}名`, LEFT + 20, detailY + 50);
+
+      if (additionalUsers > 0) {
+        doc.text(`追加料金 (${additionalUsers}名 × ¥${PRICING.ADDITIONAL_PRICE_PER_USER}): ¥${additionalAmount.toLocaleString()}`, LEFT + 20, detailY + 65);
+      }
+
+      doc.text(`合計金額（税込）: ¥${amount.toLocaleString()}`, LEFT + 20, detailY + 85);
+
+      // 発行者情報（空欄 - 将来的に追加）
+      const issuerY = detailY + 140;
+      doc.fontSize(10).text("【発行者】", RIGHT - 200, issuerY);
+      doc.text("（登録準備中）", RIGHT - 200, issuerY + 20);
+      // 将来的にインボイス番号を追加する場所
+      // doc.text("適格請求書発行事業者登録番号: T1234567890123", RIGHT - 200, issuerY + 35);
+
+      // フッター
+      doc.fontSize(8)
+        .fillColor("#666666")
+        .text(
+          "この領収書は電子的に発行されたものです。",
+          LEFT,
+          750,
+          { align: "center", width: RIGHT - LEFT }
+        );
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+/**
+ * 領収書メールを送信
+ * @param {Object} params - メールパラメータ
+ */
+async function sendReceiptEmail(params) {
+  const {
+    to,
+    companyName,
+    amount,
+    billingMonth,
+    receiptNumber,
+    pdfBuffer,
+  } = params;
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM;
+
+  if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
+    console.warn("SMTP設定が未設定のため領収書メール送信をスキップしました");
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: Number(smtpPort) || 587,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+
+  const mailBody = `
+${companyName} 様
+
+いつも労務管理システムをご利用いただきありがとうございます。
+
+${billingMonth}分のご利用料金のお支払いが完了いたしました。
+領収書を添付いたしますので、ご確認ください。
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ お支払い情報
+━━━━━━━━━━━━━━━━━━━━━━
+
+領収書番号: ${receiptNumber}
+対象月: ${billingMonth}
+金額: ¥${amount.toLocaleString()}（税込）
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+ご不明な点がございましたら、お気軽にお問い合わせください。
+
+今後とも労務管理システムをよろしくお願いいたします。
+`.trim();
+
+  await transporter.sendMail({
+    from: `"労務管理システム" <${smtpFrom}>`,
+    to,
+    subject: `【労務管理システム】${billingMonth}分 領収書のお知らせ`,
+    text: mailBody,
+    attachments: [
+      {
+        filename: `receipt_${billingMonth.replace("-", "")}_${receiptNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
+  });
+
+  return true;
+}
+
+/**
+ * 課金完了後の領収書処理
+ * @param {Object} params - 処理パラメータ
+ */
+async function processReceiptAfterCharge(params) {
+  const {
+    companyId,
+    companyName,
+    adminEmail,
+    amount,
+    userCount,
+    billingMonth,
+    chargeId,
+  } = params;
+
+  try {
+    // 領収書番号を生成
+    const receiptNumber = generateReceiptNumber(billingMonth, companyId);
+
+    // 発行日（JST）
+    const jst = toJST(new Date());
+    const issuedAt = `${jst.getFullYear()}年${jst.getMonth() + 1}月${jst.getDate()}日`;
+
+    // 領収書PDFを生成
+    const pdfBuffer = await generateReceiptPdf({
+      receiptNumber,
+      companyName,
+      amount,
+      billingMonth,
+      userCount,
+      issuedAt,
+    });
+
+    // Firebase Storageに保存
+    const storagePath = `companies/${companyId}/receipts/${billingMonth}_${receiptNumber}.pdf`;
+    const file = bucket.file(storagePath);
+    await file.save(pdfBuffer, {
+      metadata: { contentType: "application/pdf" },
+    });
+
+    // 署名付きURLを取得（1年間有効）
+    const [receiptUrl] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
+    });
+
+    // Firestoreの課金履歴を更新
+    const historySnapshot = await db
+      .collection("companies")
+      .doc(companyId)
+      .collection("billingHistory")
+      .where("chargeId", "==", chargeId)
+      .limit(1)
+      .get();
+
+    if (!historySnapshot.empty) {
+      await historySnapshot.docs[0].ref.update({
+        receiptNumber,
+        receiptUrl,
+        receiptGeneratedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    // 管理者にメール送信
+    if (adminEmail) {
+      await sendReceiptEmail({
+        to: adminEmail,
+        companyName,
+        amount,
+        billingMonth,
+        receiptNumber,
+        pdfBuffer,
+      });
+      console.log(`領収書メール送信完了: ${companyName} -> ${adminEmail}`);
+    }
+
+    return { receiptNumber, receiptUrl };
+  } catch (error) {
+    console.error(`領収書処理エラー: ${companyName}`, error);
+    return null;
+  }
+}
+
+/**
+ * 月額課金処理（毎月1日 午前9時に実行）
+ */
+exports.monthlyBilling = onSchedule(
+  {
+    schedule: "0 9 1 * *", // 毎月1日 09:00
+    timeZone: "Asia/Tokyo",
+    region: "asia-northeast1",
+  },
+  async () => {
+    console.log("月額課金処理を開始します");
+
+    const jst = toJST(new Date());
+    const billingMonth = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}`;
+
+    try {
+      const payjp = getPayjp();
+
+      // アクティブな企業を取得（カード登録済み）
+      const companiesSnapshot = await db
+        .collection("companies")
+        .where("billing.status", "==", "active")
+        .where("billing.paymentMethod", "==", "card")
+        .get();
+
+      console.log(`課金対象企業: ${companiesSnapshot.size}社`);
+
+      let successCount = 0;
+      let failCount = 0;
+      let skipCount = 0;
+
+      for (const companyDoc of companiesSnapshot.docs) {
+        const companyId = companyDoc.id;
+        const companyData = companyDoc.data();
+        const companyName = companyData.companyName || "不明";
+        const payjpCustomerId = companyData.billing?.payjpCustomerId;
+
+        // PAY.JP顧客IDがない場合はスキップ
+        if (!payjpCustomerId) {
+          console.log(`スキップ: ${companyName} (PAY.JP顧客IDなし)`);
+          skipCount++;
+          continue;
+        }
+
+        // 既にこの月の課金が完了している場合はスキップ
+        const existingBilling = await db
+          .collection("companies")
+          .doc(companyId)
+          .collection("billingHistory")
+          .where("billingMonth", "==", billingMonth)
+          .where("status", "==", "success")
+          .limit(1)
+          .get();
+
+        if (!existingBilling.empty) {
+          console.log(`スキップ: ${companyName} (${billingMonth}は課金済み)`);
+          skipCount++;
+          continue;
+        }
+
+        try {
+          // アクティブなユーザー数を取得（現場管理者＝role: manager または admin）
+          const usersSnapshot = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("users")
+            .where("isActive", "==", true)
+            .where("role", "in", ["admin", "manager"])
+            .get();
+
+          const userCount = usersSnapshot.size;
+          const amount = calculateBillingAmount(userCount);
+
+          // 管理者のメールアドレスを取得
+          const adminUser = usersSnapshot.docs.find((doc) => doc.data().role === "admin");
+          const adminEmail = adminUser?.data()?.email;
+
+          console.log(`課金実行: ${companyName} - ユーザー数: ${userCount}人, 金額: ¥${amount}`);
+
+          // PAY.JPで課金実行
+          const charge = await payjp.charges.create({
+            amount: amount,
+            currency: "jpy",
+            customer: payjpCustomerId,
+            description: `${companyName} - ${billingMonth}月額利用料`,
+            metadata: {
+              companyId: companyId,
+              billingMonth: billingMonth,
+              userCount: String(userCount),
+            },
+          });
+
+          // 課金履歴を保存
+          await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("billingHistory")
+            .add({
+              billingMonth: billingMonth,
+              amount: amount,
+              userCount: userCount,
+              chargeId: charge.id,
+              status: "success",
+              paidAt: FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
+            });
+
+          // 企業の最終課金日を更新
+          await db.collection("companies").doc(companyId).update({
+            "billing.lastBilledAt": FieldValue.serverTimestamp(),
+            "billing.lastBilledAmount": amount,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+
+          console.log(`課金成功: ${companyName} - ¥${amount} (chargeId: ${charge.id})`);
+
+          // 領収書を生成・送信
+          await processReceiptAfterCharge({
+            companyId,
+            companyName,
+            adminEmail,
+            amount,
+            userCount,
+            billingMonth,
+            chargeId: charge.id,
+          });
+
+          successCount++;
+        } catch (chargeError) {
+          console.error(`課金失敗: ${companyName}`, chargeError.message);
+
+          // 課金失敗履歴を保存
+          await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("billingHistory")
+            .add({
+              billingMonth: billingMonth,
+              status: "failed",
+              errorMessage: chargeError.message,
+              createdAt: FieldValue.serverTimestamp(),
+            });
+
+          failCount++;
+        }
+      }
+
+      console.log(`月額課金処理完了 - 成功: ${successCount}, 失敗: ${failCount}, スキップ: ${skipCount}`);
+    } catch (error) {
+      console.error("月額課金処理エラー:", error);
+    }
+  }
+);
+
+/**
+ * 手動課金実行（管理者用・テスト用）
+ */
+exports.executeBilling = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, testMode } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    // 管理者権限チェック
+    const userDoc = await db
+      .collection("companies")
+      .doc(companyId)
+      .collection("users")
+      .doc(request.auth.uid)
+      .get();
+
+    if (!userDoc.exists || userDoc.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "管理者権限が必要です");
+    }
+
+    try {
+      const companyRef = db.collection("companies").doc(companyId);
+      const companySnap = await companyRef.get();
+
+      if (!companySnap.exists) {
+        throw new HttpsError("not-found", "企業が見つかりません");
+      }
+
+      const companyData = companySnap.data();
+      const payjpCustomerId = companyData.billing?.payjpCustomerId;
+
+      if (!payjpCustomerId) {
+        throw new HttpsError("failed-precondition", "カード情報が登録されていません");
+      }
+
+      // アクティブなユーザー数を取得
+      const usersSnapshot = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .where("isActive", "==", true)
+        .where("role", "in", ["admin", "manager"])
+        .get();
+
+      const userCount = usersSnapshot.size;
+      const amount = calculateBillingAmount(userCount);
+
+      const jst = toJST(new Date());
+      const billingMonth = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}`;
+
+      // テストモードの場合は課金を実行せずに情報のみ返す
+      if (testMode) {
+        return {
+          success: true,
+          testMode: true,
+          userCount,
+          amount,
+          billingMonth,
+          message: `テストモード: ${userCount}人 × 料金計算 = ¥${amount}`,
+        };
+      }
+
+      const payjp = getPayjp();
+
+      // PAY.JPで課金実行
+      const charge = await payjp.charges.create({
+        amount: amount,
+        currency: "jpy",
+        customer: payjpCustomerId,
+        description: `${companyData.companyName} - ${billingMonth}月額利用料（手動）`,
+        metadata: {
+          companyId: companyId,
+          billingMonth: billingMonth,
+          userCount: String(userCount),
+          manual: "true",
+        },
+      });
+
+      // 課金履歴を保存
+      await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("billingHistory")
+        .add({
+          billingMonth: billingMonth,
+          amount: amount,
+          userCount: userCount,
+          chargeId: charge.id,
+          status: "success",
+          manual: true,
+          paidAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+      // 企業の最終課金日を更新
+      await companyRef.update({
+        "billing.lastBilledAt": FieldValue.serverTimestamp(),
+        "billing.lastBilledAmount": amount,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // 管理者のメールアドレスを取得
+      const adminUser = usersSnapshot.docs.find((doc) => doc.data().role === "admin");
+      const adminEmail = adminUser?.data()?.email;
+
+      // 領収書を生成・送信
+      const receiptResult = await processReceiptAfterCharge({
+        companyId,
+        companyName: companyData.companyName,
+        adminEmail,
+        amount,
+        userCount,
+        billingMonth,
+        chargeId: charge.id,
+      });
+
+      return {
+        success: true,
+        chargeId: charge.id,
+        amount,
+        userCount,
+        billingMonth,
+        receiptNumber: receiptResult?.receiptNumber,
+        receiptUrl: receiptResult?.receiptUrl,
+      };
+    } catch (error) {
+      console.error("手動課金エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `課金に失敗しました: ${error.message}`);
+    }
+  }
+);
+
+/**
+ * 課金履歴を取得
+ */
+exports.getBillingHistory = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, limit: limitParam } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    // 管理者権限チェック
+    const userDoc = await db
+      .collection("companies")
+      .doc(companyId)
+      .collection("users")
+      .doc(request.auth.uid)
+      .get();
+
+    if (!userDoc.exists || userDoc.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "管理者権限が必要です");
+    }
+
+    try {
+      const historySnapshot = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("billingHistory")
+        .orderBy("createdAt", "desc")
+        .limit(limitParam || 12)
+        .get();
+
+      const history = historySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+        paidAt: doc.data().paidAt?.toDate?.()?.toISOString() || null,
+      }));
+
+      return { history };
+    } catch (error) {
+      console.error("課金履歴取得エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "課金履歴の取得に失敗しました");
+    }
+  }
+);
+
+/**
+ * 現在の料金を計算（プレビュー用）
+ */
+exports.calculateCurrentBilling = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    try {
+      // アクティブなユーザー数を取得
+      const usersSnapshot = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("users")
+        .where("isActive", "==", true)
+        .where("role", "in", ["admin", "manager"])
+        .get();
+
+      const userCount = usersSnapshot.size;
+      const amount = calculateBillingAmount(userCount);
+      const additionalUsers = Math.max(0, userCount - PRICING.FREE_USER_COUNT);
+
+      return {
+        userCount,
+        amount,
+        breakdown: {
+          basePrice: PRICING.BASE_PRICE,
+          additionalUsers,
+          additionalAmount: additionalUsers * PRICING.ADDITIONAL_PRICE_PER_USER,
+        },
+        pricing: PRICING,
+      };
+    } catch (error) {
+      console.error("料金計算エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "料金の計算に失敗しました");
     }
   }
 );

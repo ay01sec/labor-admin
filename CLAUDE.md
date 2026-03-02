@@ -27,6 +27,23 @@
 - 3Dセキュア対応のカード登録フォーム
 - `registerCard` Cloud Function
 - 請求書払い・解約機能
+- **月額課金機能**（2026-03-02 追加）
+  - `monthlyBilling` - 毎月1日自動課金（スケジューラー）
+  - `executeBilling` - 手動課金実行（管理者用）
+  - `getBillingHistory` - 課金履歴取得
+  - `calculateCurrentBilling` - 現在の料金計算
+- **領収書自動発行**（2026-03-02 追加）
+  - 課金成功時にPDF領収書を自動生成
+  - Firebase Storageに保存
+  - 管理者にメール添付送信
+  - 但し書き: 「労務管理アプリ月額使用料」
+
+**料金体系:**
+| 項目 | 価格（税込） |
+|------|-------------|
+| 基本料金 | ¥1,200/月 |
+| 追加料金（4人目以降） | ¥300/人/月 |
+| 無料トライアル | 30日間 |
 
 ### 2. 二要素認証（2FA）
 - TOTP ベースの2FA実装
@@ -85,6 +102,12 @@
 - `onAutoApproveReport` - 自動承認・PDF/QR生成・メール送信
 - `generateBulkPdf` - PDF一括ダウンロード
 - `sendEmail` - SendGrid メール送信
+- `monthlyBilling` - 月額課金スケジューラー（毎月1日 09:00 JST）
+- `executeBilling` - 手動課金実行
+- `getBillingHistory` - 課金履歴取得
+- `calculateCurrentBilling` - 料金計算プレビュー
+- `onUserAddedToCompany` - ユーザー追加時にCustom Claim設定（Storage権限用）
+- `setCompanyClaim` - 既存ユーザー向けCustom Claim設定（モバイルアプリから呼び出し）
 
 ### 管理システム (`labor-admin/src/`)
 - `pages/reports/ReportList.jsx` - 日報一覧・削除機能
@@ -128,6 +151,7 @@ SENDGRID_API_KEY (Firebase Secret)
 
 | 日付 | 内容 |
 |------|------|
+| 2026-03-02 | 月額課金機能追加（PAY.JP charges.create）、領収書自動発行、料金体系更新 |
 | 2026-02-06 | 日報削除機能追加 |
 | 2026-02-06 | 自動承認・PDF/QR生成・メール送信機能追加 |
 | 2026-02-06 | リアルタイムステータス監視追加 |
