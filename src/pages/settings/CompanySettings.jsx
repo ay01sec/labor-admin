@@ -47,7 +47,7 @@ const CARD_BRAND_LABELS = {
 };
 
 // PAY.JP カード入力コンポーネント（3Dセキュア対応）
-function PayjpCardForm({ companyId, onSuccess, onError }) {
+function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
   const payjpRef = useRef(null);
   const cardNumberElementRef = useRef(null);
   const cardExpiryElementRef = useRef(null);
@@ -57,7 +57,11 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
   const [ready, setReady] = useState(false);
   // 3Dセキュア用の追加フィールド
   const [cardName, setCardName] = useState('');
-  const [cardEmail, setCardEmail] = useState('');
+
+  // ユニークなIDを生成
+  const cardNumberId = `payjp-card-number-${formId}`;
+  const cardExpiryId = `payjp-card-expiry-${formId}`;
+  const cardCvcId = `payjp-card-cvc-${formId}`;
 
   useEffect(() => {
     let timer;
@@ -76,9 +80,9 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
       }
 
       // DOM要素をIDで取得
-      const cardNumberEl = document.getElementById('payjp-card-number');
-      const cardExpiryEl = document.getElementById('payjp-card-expiry');
-      const cardCvcEl = document.getElementById('payjp-card-cvc');
+      const cardNumberEl = document.getElementById(cardNumberId);
+      const cardExpiryEl = document.getElementById(cardExpiryId);
+      const cardCvcEl = document.getElementById(cardCvcId);
 
       if (!cardNumberEl || !cardExpiryEl || !cardCvcEl) {
         if (attempts < maxAttempts) {
@@ -108,9 +112,9 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
         const cardExpiry = elements.create('cardExpiry', { style });
         const cardCvc = elements.create('cardCvc', { style });
 
-        cardNumber.mount('#payjp-card-number');
-        cardExpiry.mount('#payjp-card-expiry');
-        cardCvc.mount('#payjp-card-cvc');
+        cardNumber.mount(`#${cardNumberId}`);
+        cardExpiry.mount(`#${cardExpiryId}`);
+        cardCvc.mount(`#${cardCvcId}`);
 
         cardNumberElementRef.current = cardNumber;
         cardExpiryElementRef.current = cardExpiry;
@@ -146,7 +150,7 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
         cardCvcElementRef.current = null;
       }
     };
-  }, []);
+  }, [formId, cardNumberId, cardExpiryId, cardCvcId]);
 
   const handleCardSubmit = async () => {
     if (!payjpRef.current || !cardNumberElementRef.current) return;
@@ -206,32 +210,18 @@ function PayjpCardForm({ companyId, onSuccess, onError }) {
         />
         <p className="text-xs text-gray-500 mt-1">カードに記載されている名義を半角英字で入力</p>
       </div>
-      {/* メールアドレス（任意） */}
-      <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">
-          メールアドレス（任意）
-        </label>
-        <input
-          type="email"
-          value={cardEmail}
-          onChange={(e) => setCardEmail(e.target.value)}
-          placeholder="example@email.com"
-          className="w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <p className="text-xs text-gray-500 mt-1">領収書などの送信に使用します</p>
-      </div>
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-1">カード番号</label>
-        <div id="payjp-card-number" className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
+        <div id={cardNumberId} className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">有効期限</label>
-          <div id="payjp-card-expiry" className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
+          <div id={cardExpiryId} className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">CVC</label>
-          <div id="payjp-card-cvc" className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
+          <div id={cardCvcId} className="border border-gray-300 rounded-lg p-3 bg-white min-h-[44px]" />
         </div>
       </div>
       {cardError && (
@@ -1787,6 +1777,7 @@ export default function CompanySettings() {
                           <h4 className="text-sm font-medium text-gray-800 mb-3">新しいカード情報を入力</h4>
                           <PayjpCardForm
                             companyId={companyId}
+                            formId="update"
                             onSuccess={(result) => {
                               setShowCardUpdateForm(false);
                               fetchBilling();
@@ -2127,6 +2118,7 @@ export default function CompanySettings() {
                     {PAYJP_PUBLIC_KEY ? (
                       <PayjpCardForm
                         companyId={companyId}
+                        formId="register"
                         onSuccess={handleCardSuccess}
                         onError={(err) => setError(err.message || 'カード登録に失敗しました')}
                       />
