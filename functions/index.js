@@ -284,16 +284,32 @@ exports.registerCard = onCall(
         payjpCustomerId = customer.id;
         card = customer.cards.data[0];
       } else {
-        // 既存顧客 → カード追加
-        const newCard = await payjp.customers.cards.create(payjpCustomerId, {
-          card: tokenId,
-        });
-        card = newCard;
+        // 既存顧客 → カード追加を試行
+        try {
+          const newCard = await payjp.customers.cards.create(payjpCustomerId, {
+            card: tokenId,
+          });
+          card = newCard;
 
-        // デフォルトカードに設定
-        await payjp.customers.update(payjpCustomerId, {
-          default_card: card.id,
-        });
+          // デフォルトカードに設定
+          await payjp.customers.update(payjpCustomerId, {
+            default_card: card.id,
+          });
+        } catch (customerError) {
+          // 顧客が存在しない場合（テスト→本番切り替え等）、新規作成
+          if (customerError?.body?.error?.code === "invalid_id" ||
+              customerError?.body?.error?.message?.includes("No such customer")) {
+            console.log("既存顧客が見つからないため、新規作成します:", payjpCustomerId);
+            const customer = await payjp.customers.create({
+              card: tokenId,
+              description: `${companyData.companyName} (${companyData.companyCode})`,
+            });
+            payjpCustomerId = customer.id;
+            card = customer.cards.data[0];
+          } else {
+            throw customerError;
+          }
+        }
       }
 
       // 基本的なカード情報を更新
