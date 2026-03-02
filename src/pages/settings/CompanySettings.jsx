@@ -535,6 +535,7 @@ export default function CompanySettings() {
   const [dailyBillingTestLoading, setDailyBillingTestLoading] = useState(false);
   // カード変更用
   const [showCardUpdateForm, setShowCardUpdateForm] = useState(false);
+  const [cardUpdateFormKey, setCardUpdateFormKey] = useState(0);
 
   // 解約モーダル
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -1762,7 +1763,12 @@ export default function CompanySettings() {
                         </div>
                         {isAdmin() && (
                           <button
-                            onClick={() => setShowCardUpdateForm(!showCardUpdateForm)}
+                            onClick={() => {
+                              if (!showCardUpdateForm) {
+                                setCardUpdateFormKey(prev => prev + 1);
+                              }
+                              setShowCardUpdateForm(!showCardUpdateForm);
+                            }}
                             className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
                           >
                             <CreditCard size={14} />
@@ -1776,6 +1782,7 @@ export default function CompanySettings() {
                         <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
                           <h4 className="text-sm font-medium text-gray-800 mb-3">新しいカード情報を入力</h4>
                           <PayjpCardForm
+                            key={`update-${cardUpdateFormKey}`}
                             companyId={companyId}
                             formId="update"
                             onSuccess={(result) => {
