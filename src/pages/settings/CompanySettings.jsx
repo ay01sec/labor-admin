@@ -78,15 +78,12 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
     const maxAttempts = 30;
     let isMounted = true;
 
-    console.log(`[PayjpCardForm:${formId}] useEffect開始, PAYJP_PUBLIC_KEY="${PAYJP_PUBLIC_KEY}"`);
-
     const initPayjp = () => {
       if (!isMounted) return;
       attempts++;
 
       // PAY.JP SDKの読み込みを待つ
       if (!window.Payjp) {
-        console.log(`[PayjpCardForm:${formId}] Payjp not found, attempt ${attempts}`);
         if (attempts < maxAttempts) {
           timer = setTimeout(initPayjp, 200);
         } else {
@@ -100,8 +97,6 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
       const cardExpiryEl = document.getElementById(cardExpiryId);
       const cardCvcEl = document.getElementById(cardCvcId);
 
-      console.log(`[PayjpCardForm:${formId}] DOM: number=${!!cardNumberEl}, expiry=${!!cardExpiryEl}, cvc=${!!cardCvcEl}`);
-
       if (!cardNumberEl || !cardExpiryEl || !cardCvcEl) {
         if (attempts < maxAttempts) {
           timer = setTimeout(initPayjp, 200);
@@ -113,12 +108,10 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
 
       // 既に初期化済みならスキップ
       if (cardNumberElementRef.current) {
-        console.log(`[PayjpCardForm:${formId}] Already initialized`);
         return;
       }
 
       try {
-        console.log(`[PayjpCardForm:${formId}] Creating Payjp instance...`);
         const payjp = getPayjpInstance();
         if (!payjp) {
           setCardError('PAY.JPの初期化に失敗しました');
@@ -140,7 +133,6 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
         const cardExpiry = elements.create('cardExpiry', { style });
         const cardCvc = elements.create('cardCvc', { style });
 
-        console.log(`[PayjpCardForm:${formId}] Mounting elements...`);
         cardNumber.mount(`#${cardNumberId}`);
         cardExpiry.mount(`#${cardExpiryId}`);
         cardCvc.mount(`#${cardCvcId}`);
@@ -149,7 +141,6 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
         cardExpiryElementRef.current = cardExpiry;
         cardCvcElementRef.current = cardCvc;
         setReady(true);
-        console.log(`[PayjpCardForm:${formId}] Mount complete, ready=true`);
 
         cardNumber.on('change', (event) => {
           if (event.error) setCardError(event.error.message);
@@ -168,7 +159,6 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
     }
 
     return () => {
-      console.log(`[PayjpCardForm:${formId}] Cleanup`);
       isMounted = false;
       clearTimeout(timer);
       if (cardNumberElementRef.current) {
@@ -286,9 +276,12 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
       {cardError && (
         <p className="text-sm text-red-600">{cardError}</p>
       )}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
         <p className="text-xs text-blue-700">
           <strong>セキュリティ:</strong> カード情報はPAY.JPのセキュアなサーバーで処理され、当サービスには保存されません。
+        </p>
+        <p className="text-xs text-blue-600">
+          <strong>ご注意:</strong> カード有効性確認のため11円の少額決済が発生します。この金額は即時返金処理されますが、デビットカード・プリペイドカードの場合、カード会社により返金まで45〜60日程度かかる場合があります。
         </p>
       </div>
       <button
@@ -2278,19 +2271,6 @@ export default function CompanySettings() {
                 */}
               </div>
 
-              <hr />
-
-              {/* 料金プラン */}
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">料金プラン</h2>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                  <div className="text-4xl mb-3">📋</div>
-                  <p className="text-gray-600 font-medium">料金プランは準備中です</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    詳細が決まり次第、こちらに表示されます。
-                  </p>
-                </div>
-              </div>
             </div>
           )}
 
