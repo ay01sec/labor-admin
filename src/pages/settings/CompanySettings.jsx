@@ -36,6 +36,15 @@ import { DEFAULT_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_COLORS } from '../../constant
 // PAY.JP公開キー
 const PAYJP_PUBLIC_KEY = import.meta.env.VITE_PAYJP_PUBLIC_KEY;
 
+// PAY.JPインスタンスをグローバルに保持（1ページに1つのみ許可されるため）
+let payjpInstance = null;
+const getPayjpInstance = () => {
+  if (!payjpInstance && window.Payjp && PAYJP_PUBLIC_KEY) {
+    payjpInstance = window.Payjp(PAYJP_PUBLIC_KEY);
+  }
+  return payjpInstance;
+};
+
 // カードブランドの表示名
 const CARD_BRAND_LABELS = {
   'Visa': 'Visa',
@@ -110,7 +119,11 @@ function PayjpCardForm({ companyId, onSuccess, onError, formId = 'default' }) {
 
       try {
         console.log(`[PayjpCardForm:${formId}] Creating Payjp instance...`);
-        const payjp = window.Payjp(PAYJP_PUBLIC_KEY);
+        const payjp = getPayjpInstance();
+        if (!payjp) {
+          setCardError('PAY.JPの初期化に失敗しました');
+          return;
+        }
         payjpRef.current = payjp;
         const elements = payjp.elements();
 
