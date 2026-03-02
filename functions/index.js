@@ -244,6 +244,9 @@ ${displayName} 様
 
 /**
  * PAY.JP カード登録処理
+ * - トライアル中: カード情報を保存（課金はトライアル終了後）
+ * - expired/suspended: 即時課金して再開
+ * - active: カード情報を更新
  */
 exports.registerCard = onCall(
   { region: "asia-northeast1", maxInstances: 10 },
@@ -267,6 +270,7 @@ exports.registerCard = onCall(
       }
 
       const companyData = companySnap.data();
+      const currentStatus = companyData.billing?.status || "trial";
       let payjpCustomerId = companyData.billing?.payjpCustomerId;
       let card;
 
@@ -291,22 +295,124 @@ exports.registerCard = onCall(
         });
       }
 
-      // Firestoreを更新
-      await companyRef.update({
+      // 基本的なカード情報を更新
+      const updateData = {
         "billing.paymentMethod": "card",
-        "billing.status": "active",
         "billing.payjpCustomerId": payjpCustomerId,
         "billing.cardLast4": card.last4,
         "billing.cardBrand": card.brand,
+        "billing.retryCount": 0,
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      };
+
+      // トライアル中の場合: ステータスはそのまま（課金はトライアル終了後）
+      if (currentStatus === "trial") {
+        console.log(`カード登録（トライアル中）: ${companyData.companyName}`);
+        await companyRef.update(updateData);
+
+        return {
+          success: true,
+          card: { last4: card.last4, brand: card.brand },
+          message: "カードを登録しました。トライアル終了後に課金が開始されます。",
+        };
+      }
+
+      // expired/suspended の場合: 即時課金してサービス再開
+      if (currentStatus === "expired" || currentStatus === "suspended" || currentStatus === "past_due") {
+        console.log(`カード登録（再開）: ${companyData.companyName} (${currentStatus})`);
+
+        const jst = toJST(new Date());
+        const billingDay = calculateBillingDay(jst);
+        const billingMonth = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}`;
+
+        // アクティブなユーザー数を取得
+        const usersSnapshot = await db
+          .collection("companies")
+          .doc(companyId)
+          .collection("users")
+          .where("isActive", "==", true)
+          .where("role", "in", ["admin", "office", "manager", "site_manager"])
+          .get();
+
+        const userCount = usersSnapshot.size;
+        const amount = calculateBillingAmount(userCount);
+
+        // 即時課金を実行
+        const charge = await payjp.charges.create({
+          amount: amount,
+          currency: "jpy",
+          customer: payjpCustomerId,
+          description: `${companyData.companyName} - ${billingMonth}月額利用料（再開）`,
+          metadata: {
+            companyId: companyId,
+            billingMonth: billingMonth,
+            userCount: String(userCount),
+            reactivation: "true",
+          },
+        });
+
+        // 課金履歴を保存
+        await db
+          .collection("companies")
+          .doc(companyId)
+          .collection("billingHistory")
+          .add({
+            billingMonth: billingMonth,
+            amount: amount,
+            userCount: userCount,
+            chargeId: charge.id,
+            status: "success",
+            isReactivation: true,
+            paidAt: FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
+          });
+
+        // 次回課金日を計算
+        const nextBillingDate = calculateNextBillingDate(billingDay);
+
+        // ステータスをactiveに更新
+        await companyRef.update({
+          ...updateData,
+          "billing.status": "active",
+          "billing.billingDay": billingDay,
+          "billing.nextBillingDate": Timestamp.fromDate(nextBillingDate),
+          "billing.lastBilledAt": FieldValue.serverTimestamp(),
+          "billing.lastBilledAmount": amount,
+        });
+
+        // 管理者のメールアドレスを取得
+        const adminUser = usersSnapshot.docs.find((doc) => doc.data().role === "admin");
+        const adminEmail = adminUser?.data()?.email;
+
+        // 領収書を生成・送信
+        await processReceiptAfterCharge({
+          companyId,
+          companyName: companyData.companyName,
+          adminEmail,
+          amount,
+          userCount,
+          billingMonth,
+          chargeId: charge.id,
+        });
+
+        console.log(`サービス再開・課金成功: ${companyData.companyName} - ¥${amount}`);
+
+        return {
+          success: true,
+          card: { last4: card.last4, brand: card.brand },
+          chargeId: charge.id,
+          amount: amount,
+          message: "カードを登録し、サービスを再開しました。",
+        };
+      }
+
+      // active の場合: カード情報更新のみ
+      await companyRef.update(updateData);
 
       return {
         success: true,
-        card: {
-          last4: card.last4,
-          brand: card.brand,
-        },
+        card: { last4: card.last4, brand: card.brand },
+        message: "カード情報を更新しました。",
       };
     } catch (error) {
       console.error("カード登録エラー:", error);
@@ -637,9 +743,12 @@ exports.registerCompany = onCall(
           status: "trial",
           paymentMethod: null,
           payjpCustomerId: null,
-          trialEndsAt: Timestamp.fromDate(
-            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          trialEndDate: Timestamp.fromDate(
+            new Date(Date.now() + PRICING.TRIAL_DAYS * 24 * 60 * 60 * 1000)
           ),
+          billingDay: null, // 課金日（初回課金時に設定）
+          nextBillingDate: null, // 次回課金日
+          retryCount: 0,
           invoiceRequest: null,
           cardLast4: null,
           cardBrand: null,
@@ -2762,7 +2871,42 @@ const PRICING = {
   ADDITIONAL_PRICE_PER_USER: 300, // 追加料金（4人目以降）
   FREE_USER_COUNT: 3, // 基本料金に含まれるユーザー数
   TRIAL_DAYS: 30, // トライアル期間
+  RETRY_INTERVALS: [3, 7], // リトライ間隔（日数）: 3日後、7日後
+  MAX_BILLING_DAY: 28, // 最大課金日（29日以降は28日に固定）
 };
+
+/**
+ * 課金日を計算（29日以降は28日に固定）
+ * @param {Date} date - 基準日
+ * @returns {number} - 課金日（1-28）
+ */
+function calculateBillingDay(date) {
+  const day = date.getDate();
+  return Math.min(day, PRICING.MAX_BILLING_DAY);
+}
+
+/**
+ * 次回課金日を計算
+ * @param {number} billingDay - 課金日（1-28）
+ * @param {Date} fromDate - 基準日（省略時は現在）
+ * @returns {Date} - 次回課金日
+ */
+function calculateNextBillingDate(billingDay, fromDate = null) {
+  const jst = fromDate ? toJST(fromDate) : toJST(new Date());
+  let year = jst.getFullYear();
+  let month = jst.getMonth();
+
+  // 今月の課金日を過ぎている場合は来月
+  if (jst.getDate() >= billingDay) {
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+  }
+
+  return new Date(year, month, billingDay, 9, 0, 0); // 9:00 JST
+}
 
 /**
  * 課金金額を計算
@@ -3049,48 +3193,411 @@ async function processReceiptAfterCharge(params) {
 }
 
 /**
- * 月額課金処理（毎月1日 午前9時に実行）
+ * 単一企業の課金を実行する内部関数
+ * @param {Object} params - 課金パラメータ
+ * @returns {Object} - 課金結果
  */
-exports.monthlyBilling = onSchedule(
+async function executeCompanyBilling(params) {
+  const {
+    companyId,
+    companyData,
+    payjp,
+    billingMonth,
+    isRetry = false,
+  } = params;
+
+  const companyName = companyData.companyName || "不明";
+  const payjpCustomerId = companyData.billing?.payjpCustomerId;
+
+  if (!payjpCustomerId) {
+    return { success: false, reason: "no_customer_id" };
+  }
+
+  // アクティブなユーザー数を取得
+  const usersSnapshot = await db
+    .collection("companies")
+    .doc(companyId)
+    .collection("users")
+    .where("isActive", "==", true)
+    .where("role", "in", ["admin", "office", "manager", "site_manager"])
+    .get();
+
+  const userCount = usersSnapshot.size;
+  const amount = calculateBillingAmount(userCount);
+
+  // 管理者のメールアドレスを取得
+  const adminUser = usersSnapshot.docs.find((doc) => doc.data().role === "admin");
+  const adminEmail = adminUser?.data()?.email;
+
+  console.log(`課金実行: ${companyName} - ユーザー数: ${userCount}人, 金額: ¥${amount}${isRetry ? " (リトライ)" : ""}`);
+
+  // PAY.JPで課金実行
+  const charge = await payjp.charges.create({
+    amount: amount,
+    currency: "jpy",
+    customer: payjpCustomerId,
+    description: `${companyName} - ${billingMonth}月額利用料${isRetry ? "（リトライ）" : ""}`,
+    metadata: {
+      companyId: companyId,
+      billingMonth: billingMonth,
+      userCount: String(userCount),
+      isRetry: String(isRetry),
+    },
+  });
+
+  // 課金履歴を保存
+  await db
+    .collection("companies")
+    .doc(companyId)
+    .collection("billingHistory")
+    .add({
+      billingMonth: billingMonth,
+      amount: amount,
+      userCount: userCount,
+      chargeId: charge.id,
+      status: "success",
+      isRetry: isRetry,
+      paidAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+  // 次回課金日を計算
+  const billingDay = companyData.billing?.billingDay || 1;
+  const nextBillingDate = calculateNextBillingDate(billingDay);
+
+  // 企業の課金情報を更新
+  await db.collection("companies").doc(companyId).update({
+    "billing.status": "active",
+    "billing.lastBilledAt": FieldValue.serverTimestamp(),
+    "billing.lastBilledAmount": amount,
+    "billing.nextBillingDate": Timestamp.fromDate(nextBillingDate),
+    "billing.retryCount": 0,
+    "billing.lastFailedAt": FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  console.log(`課金成功: ${companyName} - ¥${amount} (chargeId: ${charge.id})`);
+
+  // 領収書を生成・送信
+  await processReceiptAfterCharge({
+    companyId,
+    companyName,
+    adminEmail,
+    amount,
+    userCount,
+    billingMonth,
+    chargeId: charge.id,
+  });
+
+  return { success: true, chargeId: charge.id, amount };
+}
+
+/**
+ * 課金失敗時の処理
+ * @param {Object} params - パラメータ
+ */
+async function handleBillingFailure(params) {
+  const { companyId, companyData, billingMonth, errorMessage, adminEmail } = params;
+
+  const currentRetryCount = companyData.billing?.retryCount || 0;
+  const newRetryCount = currentRetryCount + 1;
+  const billingDay = companyData.billing?.billingDay || 1;
+
+  // 課金失敗履歴を保存
+  await db
+    .collection("companies")
+    .doc(companyId)
+    .collection("billingHistory")
+    .add({
+      billingMonth: billingMonth,
+      status: "failed",
+      errorMessage: errorMessage,
+      retryCount: newRetryCount,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+  // リトライ上限に達した場合
+  if (newRetryCount > PRICING.RETRY_INTERVALS.length) {
+    // サービス停止
+    await db.collection("companies").doc(companyId).update({
+      "billing.status": "suspended",
+      "billing.retryCount": newRetryCount,
+      "billing.suspendedAt": FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`サービス停止: ${companyData.companyName} (リトライ上限到達)`);
+
+    // 停止通知メール送信
+    if (adminEmail) {
+      await sendBillingFailureNotification({
+        to: adminEmail,
+        companyName: companyData.companyName,
+        isSuspended: true,
+      });
+    }
+  } else {
+    // 次回リトライ日を計算
+    const retryDays = PRICING.RETRY_INTERVALS[newRetryCount - 1];
+    const nextRetryDate = new Date();
+    nextRetryDate.setDate(nextRetryDate.getDate() + retryDays);
+
+    await db.collection("companies").doc(companyId).update({
+      "billing.status": "past_due",
+      "billing.retryCount": newRetryCount,
+      "billing.lastFailedAt": FieldValue.serverTimestamp(),
+      "billing.nextRetryDate": Timestamp.fromDate(nextRetryDate),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`課金失敗: ${companyData.companyName} - 次回リトライ: ${retryDays}日後`);
+
+    // 失敗通知メール送信
+    if (adminEmail) {
+      await sendBillingFailureNotification({
+        to: adminEmail,
+        companyName: companyData.companyName,
+        retryDays: retryDays,
+        isSuspended: false,
+      });
+    }
+  }
+}
+
+/**
+ * 課金失敗通知メールを送信
+ * @param {Object} params - パラメータ
+ */
+async function sendBillingFailureNotification(params) {
+  const { to, companyName, retryDays, isSuspended } = params;
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM;
+
+  if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
+    console.warn("SMTP設定が未設定のため通知メール送信をスキップしました");
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: Number(smtpPort) || 587,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+
+  let subject, mailBody;
+
+  if (isSuspended) {
+    subject = "【重要】労務管理システム - サービス停止のお知らせ";
+    mailBody = `
+${companyName} 様
+
+ご利用料金のお支払いが確認できなかったため、サービスを一時停止いたしました。
+
+サービスを再開するには、管理画面の「決済情報」から有効なクレジットカードを登録してください。
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ サービス再開方法
+━━━━━━━━━━━━━━━━━━━━━━
+
+1. 管理画面にログイン
+2. 「自社情報設定」→「決済情報」タブを開く
+3. 有効なクレジットカードを登録
+
+カード登録後、自動的にサービスが再開されます。
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+ご不明な点がございましたら、お気軽にお問い合わせください。
+`.trim();
+  } else {
+    subject = "【重要】労務管理システム - お支払いの確認";
+    mailBody = `
+${companyName} 様
+
+ご利用料金のお支払いが確認できませんでした。
+${retryDays}日後に再度課金を試みます。
+
+クレジットカードの有効期限や利用限度額をご確認ください。
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ カード情報の更新方法
+━━━━━━━━━━━━━━━━━━━━━━
+
+1. 管理画面にログイン
+2. 「自社情報設定」→「決済情報」タブを開く
+3. 「カード情報を更新」からカードを再登録
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+ご不明な点がございましたら、お気軽にお問い合わせください。
+`.trim();
+  }
+
+  await transporter.sendMail({
+    from: `"労務管理システム" <${smtpFrom}>`,
+    to,
+    subject,
+    text: mailBody,
+  });
+}
+
+/**
+ * 日次課金処理（毎日午前9時に実行）
+ * - トライアル終了チェック
+ * - 課金日の企業への課金
+ * - リトライ処理
+ */
+exports.dailyBillingProcessor = onSchedule(
   {
-    schedule: "0 9 1 * *", // 毎月1日 09:00
+    schedule: "0 9 * * *", // 毎日 09:00
     timeZone: "Asia/Tokyo",
     region: "asia-northeast1",
   },
   async () => {
-    console.log("月額課金処理を開始します");
+    console.log("日次課金処理を開始します");
 
     const jst = toJST(new Date());
+    const today = jst.getDate();
     const billingMonth = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}`;
 
     try {
       const payjp = getPayjp();
 
-      // アクティブな企業を取得（カード登録済み）
-      const companiesSnapshot = await db
+      // ========================================
+      // 1. トライアル終了チェック
+      // ========================================
+      console.log("トライアル終了チェック...");
+
+      const trialCompaniesSnapshot = await db
+        .collection("companies")
+        .where("billing.status", "==", "trial")
+        .get();
+
+      for (const companyDoc of trialCompaniesSnapshot.docs) {
+        const companyId = companyDoc.id;
+        const companyData = companyDoc.data();
+        const companyName = companyData.companyName || "不明";
+        const trialEndDate = companyData.billing?.trialEndDate?.toDate?.();
+
+        if (!trialEndDate) continue;
+
+        // トライアル終了日を過ぎているか
+        if (jst >= trialEndDate) {
+          const payjpCustomerId = companyData.billing?.payjpCustomerId;
+
+          if (payjpCustomerId) {
+            // カード登録済み → 初回課金を実行
+            console.log(`トライアル終了（カード登録済み）: ${companyName}`);
+
+            // 課金日を決定（トライアル終了翌日、29日以降は28日）
+            const billingDay = calculateBillingDay(jst);
+
+            try {
+              // 初回課金を実行
+              await executeCompanyBilling({
+                companyId,
+                companyData: {
+                  ...companyData,
+                  billing: { ...companyData.billing, billingDay },
+                },
+                payjp,
+                billingMonth,
+                isRetry: false,
+              });
+
+              // 課金日を保存
+              await db.collection("companies").doc(companyId).update({
+                "billing.billingDay": billingDay,
+              });
+
+              console.log(`初回課金成功: ${companyName} - 課金日: ${billingDay}日`);
+            } catch (chargeError) {
+              console.error(`初回課金失敗: ${companyName}`, chargeError.message);
+
+              // 管理者メールを取得
+              const usersSnapshot = await db
+                .collection("companies")
+                .doc(companyId)
+                .collection("users")
+                .where("role", "==", "admin")
+                .limit(1)
+                .get();
+              const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+              await handleBillingFailure({
+                companyId,
+                companyData: { ...companyData, billing: { ...companyData.billing, billingDay } },
+                billingMonth,
+                errorMessage: chargeError.message,
+                adminEmail,
+              });
+
+              // 課金日を保存
+              await db.collection("companies").doc(companyId).update({
+                "billing.billingDay": billingDay,
+              });
+            }
+          } else {
+            // カード未登録 → 機能制限
+            console.log(`トライアル終了（カード未登録）: ${companyName}`);
+
+            await db.collection("companies").doc(companyId).update({
+              "billing.status": "expired",
+              "billing.expiredAt": FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+
+            // 管理者に通知メール
+            const usersSnapshot = await db
+              .collection("companies")
+              .doc(companyId)
+              .collection("users")
+              .where("role", "==", "admin")
+              .limit(1)
+              .get();
+            const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+            if (adminEmail) {
+              await sendTrialExpiredNotification({
+                to: adminEmail,
+                companyName,
+              });
+            }
+          }
+        }
+      }
+
+      // ========================================
+      // 2. 通常課金処理（課金日が今日の企業）
+      // ========================================
+      console.log(`課金日チェック（${today}日）...`);
+
+      // 今日が課金日の企業を取得
+      const billingCompaniesSnapshot = await db
         .collection("companies")
         .where("billing.status", "==", "active")
         .where("billing.paymentMethod", "==", "card")
+        .where("billing.billingDay", "==", today)
         .get();
 
-      console.log(`課金対象企業: ${companiesSnapshot.size}社`);
+      console.log(`課金対象企業: ${billingCompaniesSnapshot.size}社`);
 
       let successCount = 0;
       let failCount = 0;
       let skipCount = 0;
 
-      for (const companyDoc of companiesSnapshot.docs) {
+      for (const companyDoc of billingCompaniesSnapshot.docs) {
         const companyId = companyDoc.id;
         const companyData = companyDoc.data();
         const companyName = companyData.companyName || "不明";
-        const payjpCustomerId = companyData.billing?.payjpCustomerId;
-
-        // PAY.JP顧客IDがない場合はスキップ
-        if (!payjpCustomerId) {
-          console.log(`スキップ: ${companyName} (PAY.JP顧客IDなし)`);
-          skipCount++;
-          continue;
-        }
 
         // 既にこの月の課金が完了している場合はスキップ
         const existingBilling = await db
@@ -3109,96 +3616,182 @@ exports.monthlyBilling = onSchedule(
         }
 
         try {
-          // アクティブなユーザー数を取得（現場管理者＝role: manager または admin）
-          const usersSnapshot = await db
-            .collection("companies")
-            .doc(companyId)
-            .collection("users")
-            .where("isActive", "==", true)
-            .where("role", "in", ["admin", "office", "manager", "site_manager"])
-            .get();
-
-          const userCount = usersSnapshot.size;
-          const amount = calculateBillingAmount(userCount);
-
-          // 管理者のメールアドレスを取得
-          const adminUser = usersSnapshot.docs.find((doc) => doc.data().role === "admin");
-          const adminEmail = adminUser?.data()?.email;
-
-          console.log(`課金実行: ${companyName} - ユーザー数: ${userCount}人, 金額: ¥${amount}`);
-
-          // PAY.JPで課金実行
-          const charge = await payjp.charges.create({
-            amount: amount,
-            currency: "jpy",
-            customer: payjpCustomerId,
-            description: `${companyName} - ${billingMonth}月額利用料`,
-            metadata: {
-              companyId: companyId,
-              billingMonth: billingMonth,
-              userCount: String(userCount),
-            },
-          });
-
-          // 課金履歴を保存
-          await db
-            .collection("companies")
-            .doc(companyId)
-            .collection("billingHistory")
-            .add({
-              billingMonth: billingMonth,
-              amount: amount,
-              userCount: userCount,
-              chargeId: charge.id,
-              status: "success",
-              paidAt: FieldValue.serverTimestamp(),
-              createdAt: FieldValue.serverTimestamp(),
-            });
-
-          // 企業の最終課金日を更新
-          await db.collection("companies").doc(companyId).update({
-            "billing.lastBilledAt": FieldValue.serverTimestamp(),
-            "billing.lastBilledAmount": amount,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-
-          console.log(`課金成功: ${companyName} - ¥${amount} (chargeId: ${charge.id})`);
-
-          // 領収書を生成・送信
-          await processReceiptAfterCharge({
+          await executeCompanyBilling({
             companyId,
-            companyName,
-            adminEmail,
-            amount,
-            userCount,
+            companyData,
+            payjp,
             billingMonth,
-            chargeId: charge.id,
+            isRetry: false,
           });
-
           successCount++;
         } catch (chargeError) {
           console.error(`課金失敗: ${companyName}`, chargeError.message);
 
-          // 課金失敗履歴を保存
-          await db
+          // 管理者メールを取得
+          const usersSnapshot = await db
             .collection("companies")
             .doc(companyId)
-            .collection("billingHistory")
-            .add({
-              billingMonth: billingMonth,
-              status: "failed",
-              errorMessage: chargeError.message,
-              createdAt: FieldValue.serverTimestamp(),
-            });
+            .collection("users")
+            .where("role", "==", "admin")
+            .limit(1)
+            .get();
+          const adminEmail = usersSnapshot.docs[0]?.data()?.email;
 
+          await handleBillingFailure({
+            companyId,
+            companyData,
+            billingMonth,
+            errorMessage: chargeError.message,
+            adminEmail,
+          });
           failCount++;
         }
       }
 
-      console.log(`月額課金処理完了 - 成功: ${successCount}, 失敗: ${failCount}, スキップ: ${skipCount}`);
+      // ========================================
+      // 3. リトライ処理
+      // ========================================
+      console.log("リトライ処理...");
+
+      const pastDueCompaniesSnapshot = await db
+        .collection("companies")
+        .where("billing.status", "==", "past_due")
+        .get();
+
+      for (const companyDoc of pastDueCompaniesSnapshot.docs) {
+        const companyId = companyDoc.id;
+        const companyData = companyDoc.data();
+        const companyName = companyData.companyName || "不明";
+        const nextRetryDate = companyData.billing?.nextRetryDate?.toDate?.();
+
+        if (!nextRetryDate) continue;
+
+        // リトライ日を過ぎているか
+        if (jst >= nextRetryDate) {
+          console.log(`リトライ実行: ${companyName}`);
+
+          try {
+            await executeCompanyBilling({
+              companyId,
+              companyData,
+              payjp,
+              billingMonth,
+              isRetry: true,
+            });
+            console.log(`リトライ成功: ${companyName}`);
+          } catch (chargeError) {
+            console.error(`リトライ失敗: ${companyName}`, chargeError.message);
+
+            // 管理者メールを取得
+            const usersSnapshot = await db
+              .collection("companies")
+              .doc(companyId)
+              .collection("users")
+              .where("role", "==", "admin")
+              .limit(1)
+              .get();
+            const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+            await handleBillingFailure({
+              companyId,
+              companyData,
+              billingMonth,
+              errorMessage: chargeError.message,
+              adminEmail,
+            });
+          }
+        }
+      }
+
+      console.log(`日次課金処理完了 - 成功: ${successCount}, 失敗: ${failCount}, スキップ: ${skipCount}`);
     } catch (error) {
-      console.error("月額課金処理エラー:", error);
+      console.error("日次課金処理エラー:", error);
     }
+  }
+);
+
+/**
+ * トライアル期限切れ通知メールを送信
+ * @param {Object} params - パラメータ
+ */
+async function sendTrialExpiredNotification(params) {
+  const { to, companyName } = params;
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM;
+
+  if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
+    console.warn("SMTP設定が未設定のため通知メール送信をスキップしました");
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: Number(smtpPort) || 587,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+
+  const mailBody = `
+${companyName} 様
+
+無料トライアル期間が終了しました。
+
+サービスを継続してご利用いただくには、クレジットカードの登録が必要です。
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ 継続利用の手順
+━━━━━━━━━━━━━━━━━━━━━━
+
+1. 管理画面にログイン
+2. 「自社情報設定」→「決済情報」タブを開く
+3. クレジットカード情報を登録
+
+カード登録後、すべての機能がご利用いただけます。
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ 料金プラン
+━━━━━━━━━━━━━━━━━━━━━━
+
+基本料金: ¥1,200/月（3名まで）
+追加料金: ¥300/人/月（4人目以降）
+
+※作業員権限のユーザーは課金対象外です
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+ご不明な点がございましたら、お気軽にお問い合わせください。
+
+今後とも労務管理システムをよろしくお願いいたします。
+`.trim();
+
+  await transporter.sendMail({
+    from: `"労務管理システム" <${smtpFrom}>`,
+    to,
+    subject: "【労務管理システム】無料トライアル終了のお知らせ",
+    text: mailBody,
+  });
+}
+
+/**
+ * 旧monthlyBilling関数（互換性のため残す - 実際はdailyBillingProcessorを使用）
+ * @deprecated dailyBillingProcessorを使用してください
+ */
+exports.monthlyBilling = onSchedule(
+  {
+    schedule: "0 9 1 * *", // 毎月1日 09:00（旧スケジュール、互換性のため）
+    timeZone: "Asia/Tokyo",
+    region: "asia-northeast1",
+  },
+  async () => {
+    console.log("monthlyBilling is deprecated. Use dailyBillingProcessor instead.");
+    // 何もしない（dailyBillingProcessorが処理）
   }
 );
 
@@ -3437,6 +4030,388 @@ exports.calculateCurrentBilling = onCall(
       console.error("料金計算エラー:", error);
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "料金の計算に失敗しました");
+    }
+  }
+);
+
+/**
+ * 課金ステータスを取得
+ */
+exports.getBillingStatus = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    try {
+      const companySnap = await db.collection("companies").doc(companyId).get();
+
+      if (!companySnap.exists) {
+        throw new HttpsError("not-found", "企業が見つかりません");
+      }
+
+      const companyData = companySnap.data();
+      const billing = companyData.billing || {};
+
+      // 機能制限フラグを計算
+      const isRestricted = ["expired", "suspended"].includes(billing.status);
+
+      // トライアル残り日数を計算
+      let trialDaysRemaining = null;
+      if (billing.status === "trial" && billing.trialEndDate) {
+        const trialEndDate = billing.trialEndDate.toDate();
+        const now = new Date();
+        const diffTime = trialEndDate - now;
+        trialDaysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      }
+
+      // 次回課金日
+      let nextBillingDateStr = null;
+      if (billing.nextBillingDate) {
+        const nextDate = billing.nextBillingDate.toDate();
+        nextBillingDateStr = `${nextDate.getFullYear()}/${nextDate.getMonth() + 1}/${nextDate.getDate()}`;
+      }
+
+      return {
+        status: billing.status || "trial",
+        paymentMethod: billing.paymentMethod,
+        cardLast4: billing.cardLast4,
+        cardBrand: billing.cardBrand,
+        billingDay: billing.billingDay,
+        nextBillingDate: nextBillingDateStr,
+        trialDaysRemaining,
+        retryCount: billing.retryCount || 0,
+        isRestricted,
+        statusLabel: getStatusLabel(billing.status),
+      };
+    } catch (error) {
+      console.error("課金ステータス取得エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "課金ステータスの取得に失敗しました");
+    }
+  }
+);
+
+/**
+ * ステータスラベルを取得
+ * @param {string} status - ステータス
+ * @returns {string} - ラベル
+ */
+function getStatusLabel(status) {
+  const labels = {
+    trial: "無料トライアル中",
+    active: "有効",
+    past_due: "支払い遅延",
+    expired: "トライアル終了",
+    suspended: "サービス停止中",
+    canceled: "解約済み",
+  };
+  return labels[status] || "不明";
+}
+
+/**
+ * 日次課金処理のテスト実行（管理者用）
+ * 特定企業に対して日次課金処理をシミュレート実行します。
+ * - トライアル終了処理
+ * - 通常課金処理
+ * - リトライ処理
+ * をステータスに応じて実行します。
+ */
+exports.testDailyBilling = onCall(
+  { region: "asia-northeast1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "認証が必要です");
+    }
+
+    const { companyId, forceProcess } = request.data;
+    if (!companyId) {
+      throw new HttpsError("invalid-argument", "companyIdは必須です");
+    }
+
+    // 管理者権限チェック
+    const userDoc = await db
+      .collection("companies")
+      .doc(companyId)
+      .collection("users")
+      .doc(request.auth.uid)
+      .get();
+
+    if (!userDoc.exists || userDoc.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "管理者権限が必要です");
+    }
+
+    try {
+      const companyRef = db.collection("companies").doc(companyId);
+      const companySnap = await companyRef.get();
+
+      if (!companySnap.exists) {
+        throw new HttpsError("not-found", "企業が見つかりません");
+      }
+
+      const companyData = companySnap.data();
+      const companyName = companyData.companyName || "不明";
+      const billing = companyData.billing || {};
+      const status = billing.status || "trial";
+
+      const jst = toJST(new Date());
+      const billingMonth = `${jst.getFullYear()}-${String(jst.getMonth() + 1).padStart(2, "0")}`;
+
+      const result = {
+        companyName,
+        previousStatus: status,
+        billingMonth,
+        action: null,
+        success: false,
+        details: {},
+      };
+
+      const payjp = getPayjp();
+
+      // ========================================
+      // ケース1: トライアル中
+      // ========================================
+      if (status === "trial") {
+        const payjpCustomerId = billing.payjpCustomerId;
+
+        if (payjpCustomerId) {
+          // カード登録済み → 初回課金を実行
+          result.action = "trial_end_with_card";
+
+          const billingDay = calculateBillingDay(jst);
+
+          try {
+            const chargeResult = await executeCompanyBilling({
+              companyId,
+              companyData: {
+                ...companyData,
+                billing: { ...billing, billingDay },
+              },
+              payjp,
+              billingMonth,
+              isRetry: false,
+            });
+
+            // 課金日を保存
+            await companyRef.update({
+              "billing.billingDay": billingDay,
+            });
+
+            result.success = true;
+            result.details = {
+              chargeId: chargeResult.chargeId,
+              amount: chargeResult.amount,
+              billingDay,
+              message: `トライアル終了 → 初回課金成功 (¥${chargeResult.amount})`,
+            };
+          } catch (chargeError) {
+            // 管理者メールを取得
+            const usersSnapshot = await db
+              .collection("companies")
+              .doc(companyId)
+              .collection("users")
+              .where("role", "==", "admin")
+              .limit(1)
+              .get();
+            const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+            await handleBillingFailure({
+              companyId,
+              companyData: { ...companyData, billing: { ...billing, billingDay } },
+              billingMonth,
+              errorMessage: chargeError.message,
+              adminEmail,
+            });
+
+            // 課金日を保存
+            await companyRef.update({
+              "billing.billingDay": billingDay,
+            });
+
+            result.success = false;
+            result.details = {
+              error: chargeError.message,
+              billingDay,
+              message: "トライアル終了 → 初回課金失敗（リトライ待ち）",
+            };
+          }
+        } else {
+          // カード未登録 → 機能制限
+          result.action = "trial_end_no_card";
+
+          await companyRef.update({
+            "billing.status": "expired",
+            "billing.expiredAt": FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+
+          // 管理者に通知メール
+          const usersSnapshot = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("users")
+            .where("role", "==", "admin")
+            .limit(1)
+            .get();
+          const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+          if (adminEmail) {
+            await sendTrialExpiredNotification({
+              to: adminEmail,
+              companyName,
+            });
+          }
+
+          result.success = true;
+          result.details = {
+            newStatus: "expired",
+            message: "トライアル終了（カード未登録）→ 機能制限",
+          };
+        }
+      }
+      // ========================================
+      // ケース2: アクティブ（通常課金）
+      // ========================================
+      else if (status === "active") {
+        result.action = "monthly_billing";
+
+        const payjpCustomerId = billing.payjpCustomerId;
+        if (!payjpCustomerId) {
+          throw new HttpsError("failed-precondition", "カード情報が登録されていません");
+        }
+
+        // 既にこの月の課金が完了している場合はスキップ（forceProcessでオーバーライド可能）
+        if (!forceProcess) {
+          const existingBilling = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("billingHistory")
+            .where("billingMonth", "==", billingMonth)
+            .where("status", "==", "success")
+            .limit(1)
+            .get();
+
+          if (!existingBilling.empty) {
+            result.success = true;
+            result.details = {
+              message: `${billingMonth}は既に課金済みです（forceProcess: trueで強制実行可能）`,
+              skipped: true,
+            };
+            return result;
+          }
+        }
+
+        try {
+          const chargeResult = await executeCompanyBilling({
+            companyId,
+            companyData,
+            payjp,
+            billingMonth,
+            isRetry: false,
+          });
+
+          result.success = true;
+          result.details = {
+            chargeId: chargeResult.chargeId,
+            amount: chargeResult.amount,
+            message: `月次課金成功 (¥${chargeResult.amount})`,
+          };
+        } catch (chargeError) {
+          // 管理者メールを取得
+          const usersSnapshot = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("users")
+            .where("role", "==", "admin")
+            .limit(1)
+            .get();
+          const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+          await handleBillingFailure({
+            companyId,
+            companyData,
+            billingMonth,
+            errorMessage: chargeError.message,
+            adminEmail,
+          });
+
+          result.success = false;
+          result.details = {
+            error: chargeError.message,
+            message: "月次課金失敗 → リトライ待ち（past_due）",
+          };
+        }
+      }
+      // ========================================
+      // ケース3: 支払い遅延（リトライ）
+      // ========================================
+      else if (status === "past_due") {
+        result.action = "retry_billing";
+
+        try {
+          const chargeResult = await executeCompanyBilling({
+            companyId,
+            companyData,
+            payjp,
+            billingMonth,
+            isRetry: true,
+          });
+
+          result.success = true;
+          result.details = {
+            chargeId: chargeResult.chargeId,
+            amount: chargeResult.amount,
+            message: `リトライ課金成功 (¥${chargeResult.amount})`,
+          };
+        } catch (chargeError) {
+          // 管理者メールを取得
+          const usersSnapshot = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("users")
+            .where("role", "==", "admin")
+            .limit(1)
+            .get();
+          const adminEmail = usersSnapshot.docs[0]?.data()?.email;
+
+          await handleBillingFailure({
+            companyId,
+            companyData,
+            billingMonth,
+            errorMessage: chargeError.message,
+            adminEmail,
+          });
+
+          result.success = false;
+          result.details = {
+            error: chargeError.message,
+            retryCount: (billing.retryCount || 0) + 1,
+            message: "リトライ課金失敗",
+          };
+        }
+      }
+      // ========================================
+      // ケース4: その他のステータス
+      // ========================================
+      else {
+        result.action = "no_action";
+        result.success = true;
+        result.details = {
+          message: `ステータス「${getStatusLabel(status)}」では課金処理は実行されません`,
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("テスト課金処理エラー:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `テスト実行に失敗しました: ${error.message}`);
     }
   }
 );

@@ -540,6 +540,9 @@ export default function CompanySettings() {
   const [billingTestLoading, setBillingTestLoading] = useState(false);
   const [billingTestError, setBillingTestError] = useState('');
   const [executingBilling, setExecutingBilling] = useState(false);
+  // 日次課金テスト用
+  const [dailyBillingTest, setDailyBillingTest] = useState(null);
+  const [dailyBillingTestLoading, setDailyBillingTestLoading] = useState(false);
 
   // 解約モーダル
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -1655,6 +1658,35 @@ export default function CompanySettings() {
               {/* ご利用状況 */}
               <div>
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">ご利用状況</h2>
+
+                {/* 機能制限警告 */}
+                {(billing?.status === 'expired' || billing?.status === 'suspended') && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 flex items-start space-x-3">
+                    <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div>
+                      <p className="text-red-800 font-medium">
+                        {billing?.status === 'expired' ? 'トライアル期間が終了しました' : 'サービスが停止されています'}
+                      </p>
+                      <p className="text-red-700 text-sm mt-1">
+                        サービスを継続してご利用いただくには、クレジットカードを登録してください。
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 支払い遅延警告 */}
+                {billing?.status === 'past_due' && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4 flex items-start space-x-3">
+                    <AlertCircle className="text-orange-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div>
+                      <p className="text-orange-800 font-medium">お支払いが確認できませんでした</p>
+                      <p className="text-orange-700 text-sm mt-1">
+                        カードの有効期限や利用限度額をご確認ください。自動でリトライを行います。
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center space-x-3 mb-3">
                     <span className="text-sm font-medium text-gray-600">ステータス:</span>
@@ -1665,17 +1697,27 @@ export default function CompanySettings() {
                     )}
                     {billing?.status === 'active' && (
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        アクティブ
+                        有効
                       </span>
                     )}
                     {billing?.status === 'past_due' && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
                         支払い遅延
+                      </span>
+                    )}
+                    {billing?.status === 'expired' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                        トライアル終了
+                      </span>
+                    )}
+                    {billing?.status === 'suspended' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                        サービス停止中
                       </span>
                     )}
                     {billing?.status === 'canceled' && (
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                        キャンセル済み
+                        解約済み
                       </span>
                     )}
                     {!billing?.status && (
@@ -1684,16 +1726,39 @@ export default function CompanySettings() {
                       </span>
                     )}
                   </div>
-                  {billing?.trialEndsAt && (
-                    <div className="flex items-center space-x-3">
-                      <span className="text-sm font-medium text-gray-600">トライアル期間:</span>
+
+                  {/* トライアル期間（trialEndDateまたは旧trialEndsAt） */}
+                  {billing?.status === 'trial' && (billing?.trialEndDate || billing?.trialEndsAt) && (
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-sm font-medium text-gray-600">トライアル終了日:</span>
                       <span className="text-sm text-gray-800">
-                        {billing.trialEndsAt.toDate
-                          ? `〜 ${billing.trialEndsAt.toDate().toLocaleDateString('ja-JP')}`
+                        {(billing.trialEndDate || billing.trialEndsAt)?.toDate
+                          ? (billing.trialEndDate || billing.trialEndsAt).toDate().toLocaleDateString('ja-JP')
                           : ''}
                       </span>
                     </div>
                   )}
+
+                  {/* 課金日（activeの場合） */}
+                  {billing?.status === 'active' && billing?.billingDay && (
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-sm font-medium text-gray-600">課金日:</span>
+                      <span className="text-sm text-gray-800">毎月{billing.billingDay}日</span>
+                    </div>
+                  )}
+
+                  {/* 次回課金日 */}
+                  {billing?.status === 'active' && billing?.nextBillingDate && (
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-sm font-medium text-gray-600">次回課金日:</span>
+                      <span className="text-sm text-gray-800">
+                        {billing.nextBillingDate?.toDate
+                          ? billing.nextBillingDate.toDate().toLocaleDateString('ja-JP')
+                          : ''}
+                      </span>
+                    </div>
+                  )}
+
                   {billing?.paymentMethod === 'card' && billing?.cardLast4 && (
                     <div className="flex items-center space-x-3 mt-3">
                       <span className="text-sm font-medium text-gray-600">登録カード:</span>
@@ -1874,6 +1939,97 @@ export default function CompanySettings() {
                     {billingTestError && (
                       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                         {billingTestError}
+                      </div>
+                    )}
+
+                    <hr className="my-4" />
+
+                    {/* 日次課金処理テスト */}
+                    <div>
+                      <h4 className="font-medium text-blue-800 mb-3">日次課金処理テスト</h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        現在のステータスに応じた課金処理を実行します:
+                      </p>
+                      <ul className="text-xs text-gray-500 mb-4 space-y-1 ml-4 list-disc">
+                        <li><strong>trial</strong>: トライアル終了処理（カード有→初回課金、カード無→機能制限）</li>
+                        <li><strong>active</strong>: 月次課金を実行</li>
+                        <li><strong>past_due</strong>: リトライ課金を実行</li>
+                      </ul>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`日次課金処理をテスト実行しますか？\n\n現在のステータス: ${billing?.status || 'trial'}\n\n※ステータスに応じた処理が実行されます`)) {
+                            return;
+                          }
+                          setDailyBillingTestLoading(true);
+                          setBillingTestError('');
+                          setDailyBillingTest(null);
+                          try {
+                            const testFn = httpsCallable(functions, 'testDailyBilling');
+                            const result = await testFn({ companyId, forceProcess: true });
+                            setDailyBillingTest(result.data);
+                            // billing情報を再取得
+                            fetchBilling();
+                          } catch (err) {
+                            setBillingTestError(err.message || '日次課金処理テストに失敗しました');
+                          } finally {
+                            setDailyBillingTestLoading(false);
+                          }
+                        }}
+                        disabled={dailyBillingTestLoading}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
+                      >
+                        {dailyBillingTestLoading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Clock size={16} />
+                        )}
+                        <span>日次課金処理をテスト実行</span>
+                      </button>
+                    </div>
+
+                    {/* 日次課金テスト結果 */}
+                    {dailyBillingTest && (
+                      <div className={`rounded-lg p-4 border ${dailyBillingTest.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <h4 className={`font-medium mb-3 ${dailyBillingTest.success ? 'text-green-800' : 'text-red-800'}`}>
+                          {dailyBillingTest.success ? '処理成功' : '処理失敗'}
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">企業名:</span>
+                            <span className="font-medium">{dailyBillingTest.companyName}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">処理前ステータス:</span>
+                            <span className="font-medium">{dailyBillingTest.previousStatus}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">実行した処理:</span>
+                            <span className="font-medium">{dailyBillingTest.action}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">対象月:</span>
+                            <span className="font-medium">{dailyBillingTest.billingMonth}</span>
+                          </div>
+                          <hr className="my-2" />
+                          <div className="text-gray-700">
+                            <strong>結果:</strong> {dailyBillingTest.details?.message}
+                          </div>
+                          {dailyBillingTest.details?.chargeId && (
+                            <div className="text-gray-600">
+                              chargeId: <code className="bg-gray-100 px-1 rounded">{dailyBillingTest.details.chargeId}</code>
+                            </div>
+                          )}
+                          {dailyBillingTest.details?.amount && (
+                            <div className="text-gray-600">
+                              金額: <span className="font-semibold">¥{dailyBillingTest.details.amount.toLocaleString()}</span>
+                            </div>
+                          )}
+                          {dailyBillingTest.details?.error && (
+                            <div className="text-red-600">
+                              エラー: {dailyBillingTest.details.error}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
