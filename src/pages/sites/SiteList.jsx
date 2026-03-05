@@ -47,7 +47,8 @@ function StatusBadge({ status }) {
 }
 
 export default function SiteList() {
-  const { companyId, isOfficeOrAbove } = useAuth();
+  const { companyId, isOfficeOrAbove, isServiceRestricted, getBillingStatus } = useAuth();
+  const serviceRestricted = isServiceRestricted();
   
   const [sites, setSites] = useState([]);
   const [clients, setClients] = useState([]);
@@ -169,23 +170,56 @@ export default function SiteList() {
         </h1>
         {isOfficeOrAbove() && (
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              <Upload size={20} />
-              <span>CSVインポート</span>
-            </button>
-            <Link
-              to="/sites/new"
-              className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus size={20} />
-              <span>新規登録</span>
-            </Link>
+            {serviceRestricted ? (
+              <>
+                <span
+                  className="inline-flex items-center justify-center space-x-2 border border-gray-400 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed"
+                  title="サービス制限中のためインポートできません"
+                >
+                  <Upload size={20} />
+                  <span>CSVインポート</span>
+                </span>
+                <span
+                  className="inline-flex items-center justify-center space-x-2 bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
+                  title="サービス制限中のため新規登録できません"
+                >
+                  <Plus size={20} />
+                  <span>新規登録</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="inline-flex items-center justify-center space-x-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  <Upload size={20} />
+                  <span>CSVインポート</span>
+                </button>
+                <Link
+                  to="/sites/new"
+                  className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus size={20} />
+                  <span>新規登録</span>
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>
+
+      {/* サービス制限警告 */}
+      {serviceRestricted && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <p className="text-sm font-medium">
+            {getBillingStatus() === 'expired' ? 'トライアル期間が終了しました' : 'サービスが停止されています'}
+          </p>
+          <p className="text-sm mt-1">
+            新規現場の追加ができません。決済情報を設定して、サービスを再開してください。
+          </p>
+        </div>
+      )}
 
       {/* 検索・フィルター */}
       <div className="bg-white rounded-xl shadow-sm p-4">
@@ -349,7 +383,7 @@ export default function SiteList() {
           <div className="p-8 text-center text-gray-500">
             <MapPin size={48} className="mx-auto mb-4 text-gray-300" />
             <p>現場データがありません</p>
-            {isOfficeOrAbove() && (
+            {isOfficeOrAbove() && !serviceRestricted && (
               <Link
                 to="/sites/new"
                 className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 mt-4"

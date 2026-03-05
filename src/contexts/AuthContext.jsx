@@ -461,6 +461,17 @@ export function AuthProvider({ children }) {
     return isOfficeOrAbove();
   }
 
+  // サービス制限チェック（expired または suspended の場合は制限）
+  function isServiceRestricted() {
+    const status = companyInfo?.billing?.status;
+    return ['expired', 'suspended'].includes(status);
+  }
+
+  // 課金ステータス取得
+  function getBillingStatus() {
+    return companyInfo?.billing?.status || 'trial';
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('onAuthStateChanged fired, user:', !!user, 'loginInProgress:', loginInProgressRef.current, 'is2FAPending:', is2FAPendingRef.current);
@@ -529,7 +540,10 @@ export function AuthProvider({ children }) {
     cancel2FA,
     twoFACodeSent,
     twoFADevCode,
-    loginInProgress
+    loginInProgress,
+    // サービス制限関連
+    isServiceRestricted,
+    getBillingStatus
   };
 
   return (

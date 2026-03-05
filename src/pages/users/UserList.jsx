@@ -93,7 +93,8 @@ function StatusBadge({ isActive }) {
 }
 
 export default function UserList() {
-  const { companyId, userInfo, isOfficeOrAbove, resetPassword } = useAuth();
+  const { companyId, userInfo, isOfficeOrAbove, resetPassword, isServiceRestricted, getBillingStatus } = useAuth();
+  const serviceRestricted = isServiceRestricted();
 
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -253,15 +254,37 @@ export default function UserList() {
           <span>ユーザー管理</span>
         </h1>
         {isOfficeOrAbove() && (
-          <Link
-            to="/users/new"
-            className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={20} />
-            <span>新規登録</span>
-          </Link>
+          serviceRestricted ? (
+            <span
+              className="inline-flex items-center justify-center space-x-2 bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
+              title="サービス制限中のため新規登録できません"
+            >
+              <Plus size={20} />
+              <span>新規登録</span>
+            </span>
+          ) : (
+            <Link
+              to="/users/new"
+              className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={20} />
+              <span>新規登録</span>
+            </Link>
+          )
         )}
       </div>
+
+      {/* サービス制限警告 */}
+      {serviceRestricted && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <p className="text-sm font-medium">
+            {getBillingStatus() === 'expired' ? 'トライアル期間が終了しました' : 'サービスが停止されています'}
+          </p>
+          <p className="text-sm mt-1">
+            新規ユーザーの追加ができません。決済情報を設定して、サービスを再開してください。
+          </p>
+        </div>
+      )}
 
       {/* 説明 */}
       <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
