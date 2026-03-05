@@ -3508,9 +3508,10 @@ exports.dailyBillingProcessor = onSchedule(
         const companyName = companyData.companyName || "不明";
         const trialEndDate = companyData.billing?.trialEndDate?.toDate?.();
 
-        // テスト企業（00000000）は自動課金処理から除外
-        if (companyData.companyCode === "00000000") {
-          console.log(`スキップ: ${companyName} (テスト企業)`);
+        // テスト企業（企業コード10000000以下）は自動課金処理から除外
+        const companyCodeNum = parseInt(companyData.companyCode, 10);
+        if (!isNaN(companyCodeNum) && companyCodeNum <= 10000000) {
+          console.log(`スキップ: ${companyName} (テスト企業: ${companyData.companyCode})`);
           continue;
         }
 
@@ -3698,9 +3699,10 @@ exports.dailyBillingProcessor = onSchedule(
         const companyName = companyData.companyName || "不明";
         const nextRetryDate = companyData.billing?.nextRetryDate?.toDate?.();
 
-        // テスト企業（00000000）は自動課金処理から除外
-        if (companyData.companyCode === "00000000") {
-          console.log(`スキップ: ${companyName} (テスト企業)`);
+        // テスト企業（企業コード10000000以下）は自動課金処理から除外
+        const companyCodeNum = parseInt(companyData.companyCode, 10);
+        if (!isNaN(companyCodeNum) && companyCodeNum <= 10000000) {
+          console.log(`スキップ: ${companyName} (テスト企業: ${companyData.companyCode})`);
           continue;
         }
 
