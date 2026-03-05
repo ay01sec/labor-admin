@@ -3508,6 +3508,12 @@ exports.dailyBillingProcessor = onSchedule(
         const companyName = companyData.companyName || "不明";
         const trialEndDate = companyData.billing?.trialEndDate?.toDate?.();
 
+        // テスト企業（00000000）は自動課金処理から除外
+        if (companyData.companyCode === "00000000") {
+          console.log(`スキップ: ${companyName} (テスト企業)`);
+          continue;
+        }
+
         if (!trialEndDate) continue;
 
         // トライアル終了日を過ぎているか
@@ -3620,6 +3626,13 @@ exports.dailyBillingProcessor = onSchedule(
         const companyData = companyDoc.data();
         const companyName = companyData.companyName || "不明";
 
+        // テスト企業（00000000）は自動課金処理から除外
+        if (companyData.companyCode === "00000000") {
+          console.log(`スキップ: ${companyName} (テスト企業)`);
+          skipCount++;
+          continue;
+        }
+
         // 既にこの月の課金が完了している場合はスキップ
         const existingBilling = await db
           .collection("companies")
@@ -3684,6 +3697,12 @@ exports.dailyBillingProcessor = onSchedule(
         const companyData = companyDoc.data();
         const companyName = companyData.companyName || "不明";
         const nextRetryDate = companyData.billing?.nextRetryDate?.toDate?.();
+
+        // テスト企業（00000000）は自動課金処理から除外
+        if (companyData.companyCode === "00000000") {
+          console.log(`スキップ: ${companyName} (テスト企業)`);
+          continue;
+        }
 
         if (!nextRetryDate) continue;
 

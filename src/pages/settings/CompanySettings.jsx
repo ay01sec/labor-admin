@@ -1914,8 +1914,8 @@ export default function CompanySettings() {
                 </div>
               </div>
 
-              {/* 課金テストセクション（管理者のみ） */}
-              {isAdmin() && (
+              {/* 課金テストセクション（開発環境の管理者のみ） */}
+              {import.meta.env.DEV && isAdmin() && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                   <h3 className="text-sm font-semibold text-blue-800 mb-4 flex items-center space-x-2">
                     <Settings size={16} />
