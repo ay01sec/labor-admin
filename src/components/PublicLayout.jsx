@@ -30,7 +30,7 @@ export default function PublicLayout() {
           <Link to="/legal/privacy" className="hover:text-white transition">プライバシーポリシー</Link>
           <Link to="/legal/tokushoho" className="hover:text-white transition">特定商取引法に基づく表記</Link>
         </div>
-        <p>&copy; 2026 業務改善屋さん All rights reserved.</p>
+        <p>&copy; 2026 AYBDX Inc. All rights reserved.</p>
       </footer>
     </div>
   );

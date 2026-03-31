@@ -201,7 +201,7 @@ export default function Dashboard() {
 
         // お知らせ
         const notificationList = [
-          { id: 1, message: '4月1日 iPhone用日報アプリリリース予定', type: 'info' },
+          { id: 1, message: '4月1日 iPhone用日報アプリリリースしました', type: 'info', link: 'https://apps.apple.com/jp/app/%E4%BD%9C%E6%A5%AD%E6%97%A5%E5%A0%B1-cds/id6758916108' },
         ];
         if (pendingReportsSnap.size > 0) {
           notificationList.push({ id: 2, message: '承認待ちの日報が' + pendingReportsSnap.size + '件あります', type: 'warning' });
@@ -310,7 +310,13 @@ export default function Dashboard() {
                       note.type === 'warning' ? 'text-orange-500' : 'text-blue-500'
                     }`}
                   />
-                  <span className="text-gray-600">{note.message}</span>
+                  {note.link ? (
+                    <a href={note.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {note.message}
+                    </a>
+                  ) : (
+                    <span className="text-gray-600">{note.message}</span>
+                  )}
                 </li>
               ))}
             </ul>

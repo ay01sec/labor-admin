@@ -2990,10 +2990,10 @@ function generateReceiptPdf(params) {
       doc.fontSize(28).text("領 収 書", LEFT, 80, { align: "center" });
 
       // 領収書番号
-      doc.fontSize(10).text(`No. ${receiptNumber}`, RIGHT - 150, 80, { width: 150, align: "right" });
+      doc.fontSize(8).text(`No. ${receiptNumber}`, RIGHT - 200, 60, { width: 200, align: "right" });
 
       // 発行日
-      doc.fontSize(11).text(`発行日: ${issuedAt}`, RIGHT - 150, 95, { width: 150, align: "right" });
+      doc.fontSize(9).text(`発行日: ${issuedAt}`, RIGHT - 200, 75, { width: 200, align: "right" });
 
       // 宛名
       doc.fontSize(14).text(`${companyName} 御中`, LEFT, 150);
@@ -3010,7 +3010,7 @@ function generateReceiptPdf(params) {
       });
 
       // 但し書き
-      doc.fontSize(11).text("但し、労務管理アプリ月額使用料として", LEFT, amountY + 80);
+      doc.fontSize(11).text("但し、労務管理アプリ月額使用料として　　　クレジットカード利用", LEFT, amountY + 80);
 
       // 内訳
       const detailY = amountY + 120;
@@ -3030,12 +3030,19 @@ function generateReceiptPdf(params) {
 
       doc.text(`合計金額（税込）: ¥${amount.toLocaleString()}`, LEFT + 20, detailY + 85);
 
-      // 発行者情報（空欄 - 将来的に追加）
+      // 発行者情報
       const issuerY = detailY + 140;
       doc.fontSize(10).text("【発行者】", RIGHT - 200, issuerY);
-      doc.text("（登録準備中）", RIGHT - 200, issuerY + 20);
-      // 将来的にインボイス番号を追加する場所
-      // doc.text("適格請求書発行事業者登録番号: T1234567890123", RIGHT - 200, issuerY + 35);
+      doc.fontSize(9);
+      doc.text("AYBDX株式会社", RIGHT - 200, issuerY + 18);
+      doc.text("〒080-0804", RIGHT - 200, issuerY + 33);
+      doc.text("北海道帯広市東4条14丁目6-3", RIGHT - 200, issuerY + 46);
+      doc.text("クラックスハイム第三帯広501", RIGHT - 200, issuerY + 59);
+      doc.text("TEL: 070-8533-0395", RIGHT - 200, issuerY + 74);
+
+      // 印鑑画像
+      const stampPath = path.join(__dirname, "assets", "stamp.png");
+      doc.image(stampPath, RIGHT - 80, issuerY + 10, { width: 60, height: 60 });
 
       // フッター
       doc.fontSize(8)
