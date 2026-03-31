@@ -139,6 +139,30 @@
 
 ---
 
+## 技術スタック
+
+| カテゴリ | 技術 |
+|---------|------|
+| フレームワーク | React 19 / Vite 7 |
+| スタイリング | Tailwind CSS 4 |
+| バックエンド | Firebase (Auth, Firestore, Storage, Functions, Hosting) |
+| 決済 | PAY.JP（3Dセキュア対応） |
+| メール | SendGrid |
+| PDF生成 | PDFKit（日本語フォント対応） |
+| アイコン | Lucide React |
+| E2Eテスト | Playwright |
+
+## 開発コマンド
+
+```bash
+npm run dev      # 開発サーバー起動
+npm run build    # プロダクションビルド
+npm run lint     # ESLint実行
+npm run test:e2e # E2Eテスト実行
+```
+
+---
+
 ## 環境変数
 
 ### フロントエンド (`.env` / `.env.production`)
@@ -181,6 +205,7 @@ firebase functions:secrets:set PAYJP_SECRET_KEY
 
 | 日付 | 内容 |
 |------|------|
+| 2026-04-01 | 技術スタック情報追加、npm audit fix実施 |
 | 2026-03-02 | 課金システム改修: トライアル終了日基準の課金、日次スケジューラー、リトライ処理、機能制限 |
 | 2026-03-02 | 月額課金機能追加（PAY.JP charges.create）、領収書自動発行、料金体系更新 |
 | 2026-02-06 | 日報削除機能追加 |
